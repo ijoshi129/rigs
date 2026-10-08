@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #1b2029;
+  --color-surface: #242a35;
+  --color-raised: #2c3340;
+  --color-ink: #eef0f3;
+  --color-dim: #9aa3b2;
+  --color-ember: #e8762b;
+  --color-hairline: rgb(255 255 255 / 0.08);
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --radius-deck: 1.5rem;
+}
+
+html {
+  color-scheme: dark;
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-number {
+    transition: color 250ms ease-out;
+  }
+}
+
+/* Hide scrollbars on chip rows; they still scroll. */
+.chips {
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-ember);
+  outline-offset: 3px;
+}
