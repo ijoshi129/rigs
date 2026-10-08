@@ -7,3 +7,5 @@ xcuserdata/
 *.ipa
 *.dSYM.zip
 Rigs.xcodeproj/
+web/node_modules/
+web/dist/
