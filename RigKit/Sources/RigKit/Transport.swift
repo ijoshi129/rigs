@@ -30,7 +30,7 @@ public enum RigKitError: Error, Sendable, Equatable {
 }
 
 /// Runs `body` and throws `RigKitError.timeout` if it has not finished in time.
-func withTimeout<T: Sendable>(
+public func withTimeout<T: Sendable>(
     _ duration: Duration,
     _ body: @escaping @Sendable () async throws -> T
 ) async throws -> T {
