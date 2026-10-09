@@ -1,3 +1,4 @@
+import { PeakProIcon, Switch2Icon } from "../devices";
 import { formatTemp, useSettings } from "../settings";
 import { type HistoryEntry, rigName, store, useRigs } from "../store";
 import { Glass, Screen, SectionLabel } from "../ui";
@@ -51,7 +52,7 @@ export function HistoryScreen() {
                   <span className="text-[13px] font-semibold text-ink-2 w-[62px] tnum">{timeOf(e.start)}</span>
                   <span className="rounded-face text-[24px] font-extrabold w-[62px] tnum">{e.targetF !== undefined ? `${formatTemp(e.targetF, s.units)}°` : "—"}</span>
                   <span className="flex flex-col flex-1 min-w-0">
-                    <span className="text-[15px] font-semibold">{rigName[e.rig]}{e.profile ? ` · ${e.profile}` : ""}</span>
+                    <span className="text-[15px] font-semibold flex items-center gap-1.5"><span className="text-ink/70">{e.rig === "switch2" ? <Switch2Icon size={16} /> : <PeakProIcon size={16} />}</span>{rigName[e.rig]}{e.profile ? ` · ${e.profile}` : ""}</span>
                     <span className="text-[12px] font-medium text-ink-2">
                       {[e.holdS ? `${e.holdS} s` : undefined, e.peakF ? `peaked ${formatTemp(e.peakF, s.units)}°` : undefined, e.extended ? "extended" : undefined, e.boosted ? "boosted" : undefined].filter(Boolean).join(" · ")}
                     </span>

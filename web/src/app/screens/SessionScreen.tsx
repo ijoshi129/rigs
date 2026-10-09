@@ -3,7 +3,8 @@ import { navigate } from "../router";
 import { formatTemp, useSettings } from "../settings";
 import { type PeakProSlot, type Sample, type Switch2Slot, rigName, store, useRigs } from "../store";
 import { heatColor } from "../theme";
-import { BoltIcon, GearIcon, GlassButton, IconButton, Screen, Segmented, StopIcon, SwapIcon } from "../ui";
+import { PeakProIcon, Switch2Icon } from "../devices";
+import { BoltIcon, GearIcon, GlassButton, IconButton, Screen, Segmented, StopIcon } from "../ui";
 import { ConnectScreen } from "./ConnectScreen";
 
 export function SessionScreen() {
@@ -24,7 +25,11 @@ function Header({ name, battery, charging, canSwap, kind }: { name: string; batt
         {battery !== undefined && <span className="text-[15px] font-semibold text-ink-2 tnum shrink-0">{battery}%{charging ? " ⚡" : ""}</span>}
       </div>
       <div className="flex gap-2">
-        {canSwap && <IconButton label={`Switch to ${kind === "switch2" ? "Peak Pro" : "Switch 2"}`} onClick={() => store.setActiveRig(kind === "switch2" ? "peakPro" : "switch2")}><SwapIcon /></IconButton>}
+        {canSwap && (
+          <IconButton label={`Switch to ${kind === "switch2" ? "Peak Pro" : "Switch 2"}`} onClick={() => store.setActiveRig(kind === "switch2" ? "peakPro" : "switch2")}>
+            {kind === "switch2" ? <PeakProIcon size={22} /> : <Switch2Icon size={22} />}
+          </IconButton>
+        )}
         <IconButton label="Appearance and settings" href="#/appearance"><GearIcon /></IconButton>
       </div>
     </header>

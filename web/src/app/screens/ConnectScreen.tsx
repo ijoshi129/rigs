@@ -1,3 +1,4 @@
+import { PeakProRender, Switch2Render } from "../devices";
 import { type RigKind, rigName, store, useRigs } from "../store";
 import { Glass, Screen } from "../ui";
 
@@ -51,11 +52,9 @@ function RigCard({ kind, connected, connecting, busy, mock, available }: { kind:
   const detail = kind === "switch2" ? "Dr. Dabber · induction, 5 presets" : "Puffco · 4 profiles, lantern";
   return (
     <Glass className="flex items-center gap-4 p-5" radius={26}>
-      {kind === "switch2" ? (
-        <svg width="44" height="58" viewBox="0 0 56 72" aria-hidden="true" className="text-ink/85"><rect x="6" y="2" width="44" height="68" rx="10" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="28" cy="22" r="11" fill="none" stroke="currentColor" strokeWidth="2" /><rect x="18" y="44" width="20" height="6" rx="3" fill="currentColor" /><rect x="18" y="56" width="20" height="6" rx="3" fill="currentColor" opacity="0.4" /></svg>
-      ) : (
-        <svg width="44" height="58" viewBox="0 0 56 72" aria-hidden="true" className="text-ink/85"><path d="M14 70 C 6 70, 4 62, 8 54 L 20 30 L 36 30 L 48 54 C 52 62, 50 70, 42 70 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><rect x="20" y="4" width="16" height="26" rx="6" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="28" cy="56" r="5" fill="currentColor" /></svg>
-      )}
+      <div className="shrink-0 w-[68px] flex justify-center">
+        {kind === "switch2" ? <Switch2Render height={118} /> : <PeakProRender height={118} />}
+      </div>
       <span className="flex flex-col gap-0.5 flex-1 min-w-0">
         <span className="text-[20px] font-extrabold">{rigName[kind]}</span>
         <span className="text-[13px] font-medium text-ink-2">{connected ? "Connected" : detail}</span>
