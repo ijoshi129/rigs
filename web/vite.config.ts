@@ -5,6 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // GitHub Pages serves the site under /<repo>/; set VITE_BASE=/ for other hosts.
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "0.1.0") },
   base: process.env.VITE_BASE ?? "/rigs/",
   plugins: [
     react(),

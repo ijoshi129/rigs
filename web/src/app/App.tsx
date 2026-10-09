@@ -1,27 +1,38 @@
 import { useEffect } from "react";
-import { ConnectPanel } from "./ConnectPanel";
-import { PeakProDeck } from "./PeakProDeck";
-import { Switch2Deck } from "./Switch2Deck";
-import { store, useRigs } from "./store";
+import { useRoute } from "./router";
+import { store } from "./store";
+import { TabBar, Wallpaper } from "./ui";
+import { AppearanceScreen } from "./screens/AppearanceScreen";
+import { ConnectScreen } from "./screens/ConnectScreen";
+import { HistoryScreen } from "./screens/HistoryScreen";
+import { LightsScreen } from "./screens/LightsScreen";
+import { PresetEditScreen } from "./screens/PresetEditScreen";
+import { PresetsScreen } from "./screens/PresetsScreen";
+import { SessionScreen } from "./screens/SessionScreen";
 
 export function App() {
-  const snap = useRigs();
+  const route = useRoute();
 
   useEffect(() => {
     void store.reconnectRemembered();
   }, []);
 
+  let screen;
+  switch (route.name) {
+    case "presets": screen = <PresetsScreen />; break;
+    case "preset": screen = <PresetEditScreen id={route.id} />; break;
+    case "lights": screen = <LightsScreen />; break;
+    case "history": screen = <HistoryScreen />; break;
+    case "appearance": screen = <AppearanceScreen />; break;
+    case "connect": screen = <ConnectScreen />; break;
+    default: screen = <SessionScreen />;
+  }
+
   return (
-    <main className="mx-auto max-w-[1100px] px-4 pb-10 pt-6 sm:pt-10">
-      <h1 className="text-[40px] font-extrabold tracking-tight leading-none mb-6">Rigs</h1>
-      <div className="grid gap-4 md:grid-cols-2 items-start">
-        {snap.switch2 && <Switch2Deck slot={snap.switch2} />}
-        {snap.peakPro && <PeakProDeck slot={snap.peakPro} />}
-        <ConnectPanel snap={snap} />
-      </div>
-      {snap.mock && (
-        <p className="mt-6 text-[13px] font-medium text-dim">Both rigs are simulated. Drop <code>?mock</code> from the address to use real ones.</p>
-      )}
-    </main>
+    <>
+      <Wallpaper />
+      {screen}
+      <TabBar />
+    </>
   );
 }
