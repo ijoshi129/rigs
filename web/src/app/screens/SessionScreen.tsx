@@ -8,11 +8,11 @@ import { ConnectScreen } from "./ConnectScreen";
 
 export function SessionScreen() {
   const snap = useRig();
+  const s = useSettings();
   const slot = snap.rig;
   if (!slot) return <ConnectScreen />;
 
   const { state, device, history } = slot;
-  const s = useSettings();
   const status = state.status;
   const heating = status?.sessionActive ?? false;
   const tempF = status ? Switch2.statusF(status) : undefined;
