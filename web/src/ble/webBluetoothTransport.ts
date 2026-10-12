@@ -1,5 +1,16 @@
 import { type BLETransport, RigKitError } from "../rigkit";
 
+/**
+ * Canonical lowercase 128-bit UUID. Chrome already returns this form; Bluefy
+ * on iOS returns CoreBluetooth's short form ("FEC1") for 16-bit UUIDs.
+ */
+export function canonicalUUID(u: string): string {
+  const s = u.trim().toLowerCase().replace(/^0x/, "");
+  if (/^[0-9a-f]{4}$/.test(s)) return `0000${s}-0000-1000-8000-00805f9b34fb`;
+  if (/^[0-9a-f]{8}$/.test(s)) return `${s}-0000-1000-8000-00805f9b34fb`;
+  return s;
+}
+
 /** BLETransport over one Web Bluetooth device. Call `open` before anything else. */
 export class WebBluetoothTransport implements BLETransport {
   private chars = new Map<string, BluetoothRemoteGATTCharacteristic>();
@@ -24,7 +35,7 @@ export class WebBluetoothTransport implements BLETransport {
       try {
         const service = await server.getPrimaryService(uuid.toLowerCase());
         this.services.push(uuid);
-        for (const c of await service.getCharacteristics()) this.chars.set(c.uuid.toLowerCase(), c);
+        for (const c of await service.getCharacteristics()) this.chars.set(canonicalUUID(c.uuid), c);
       } catch {
         // Service absent on this device; fine.
       }
@@ -36,11 +47,11 @@ export class WebBluetoothTransport implements BLETransport {
   }
 
   has(characteristic: string) {
-    return this.chars.has(characteristic.toLowerCase());
+    return this.chars.has(canonicalUUID(characteristic));
   }
 
   private char(uuid: string) {
-    const c = this.chars.get(uuid.toLowerCase());
+    const c = this.chars.get(canonicalUUID(uuid));
     if (!c) throw new RigKitError(this.device.gatt?.connected ? "unsupported" : "notConnected", `characteristic ${uuid}`);
     return c;
   }
