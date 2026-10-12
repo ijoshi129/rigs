@@ -13,7 +13,7 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["web-bluetooth", "vite/client"]
+    "types": ["web-bluetooth", "vite/client", "vite-plugin-pwa/client"]
   },
   "include": ["src"]
 }
