@@ -4,6 +4,8 @@ import { type BLETransport, RigKitError } from "../rigkit";
 export class WebBluetoothTransport implements BLETransport {
   private chars = new Map<string, BluetoothRemoteGATTCharacteristic>();
   private handlers: (() => void)[] = [];
+  /** Services found on the device, for diagnostics. */
+  readonly services: string[] = [];
 
   constructor(readonly device: BluetoothDevice) {
     device.addEventListener("gattserverdisconnected", () => {
@@ -17,14 +19,20 @@ export class WebBluetoothTransport implements BLETransport {
     const gatt = this.device.gatt;
     if (!gatt) throw new RigKitError("unsupported", "device has no GATT");
     const server = await gatt.connect();
+    this.services.length = 0;
     for (const uuid of services) {
       try {
         const service = await server.getPrimaryService(uuid);
+        this.services.push(uuid);
         for (const c of await service.getCharacteristics()) this.chars.set(c.uuid, c);
       } catch {
         // Service absent on this device; fine.
       }
     }
+  }
+
+  get characteristicUUIDs(): string[] {
+    return Array.from(this.chars.keys());
   }
 
   has(characteristic: string) {

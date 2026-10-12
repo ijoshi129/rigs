@@ -127,11 +127,14 @@ class RigStore {
   private async connectDevice(device: BluetoothDevice) {
     const transport = new WebBluetoothTransport(device);
     await transport.open(Switch2.optionalServices);
-    if (!transport.has(Switch2.UUIDs.controlNotify) && !transport.has(Switch2.UUIDs.fallbackNotify)) {
+    const chars = Switch2.characteristicSets.find((c) => transport.has(c.notify) && transport.has(c.write));
+    if (!chars) {
+      const short = (u: string) => (u.startsWith("0000") && u.endsWith("-0000-1000-8000-00805f9b34fb") ? u.slice(4, 8) : u.slice(0, 8));
+      const found = transport.services.map(short).join(", ") || "none we asked for";
+      const chars = transport.characteristicUUIDs.map(short).join(", ") || "none";
       await transport.disconnect();
-      throw new Error(`"${device.name ?? "that device"}" doesn't speak the Switch 2 protocol.`);
+      throw new Error(`"${device.name ?? "that device"}" doesn't expose the Switch 2 control characteristics. Services found: ${found}. Characteristics: ${chars}.`);
     }
-    const chars = transport.has(Switch2.UUIDs.controlNotify) ? Switch2.CONTROL : Switch2.FALLBACK;
     const dev = new Switch2Device(transport, chars);
     this.attach(dev, device.name ?? "Switch 2");
     await dev.connect();

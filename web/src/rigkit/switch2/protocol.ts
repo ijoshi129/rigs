@@ -12,6 +12,10 @@ export const UUIDs = {
   fallbackService: "f56598fa-3ffa-41a7-9726-3fc69baeca1d",
   fallbackWrite: "2c759c29-a73c-45ab-a799-31d6a032f6af",
   fallbackNotify: "744c98ff-83c6-45d5-bd0c-52a50589215b",
+  /** The UUID set the official app uses for the Switch Go; same packets. */
+  goService: "55535343-fe7d-4ae5-8fa9-9fafd205e455",
+  goWrite: "49535343-8841-43f4-a8d4-ecbe34729bb3",
+  goNotify: "49535343-1e4d-4bd9-ba61-23c647249616",
   otaService: "e5c7a653-7e52-4b06-af32-960455084ae3",
   deviceInformation: "0000180a-0000-1000-8000-00805f9b34fb",
   modelNumber: "00002a24-0000-1000-8000-00805f9b34fb",
@@ -24,7 +28,7 @@ export const UUIDs = {
 } as const;
 
 /** Services to request on connect. The OTA service is deliberately absent. */
-export const optionalServices = [UUIDs.deviceInformation, UUIDs.batteryService, UUIDs.controlService, UUIDs.fallbackService];
+export const optionalServices = [UUIDs.deviceInformation, UUIDs.batteryService, UUIDs.controlService, UUIDs.fallbackService, UUIDs.goService];
 
 export interface Characteristics {
   write: string;
@@ -32,6 +36,9 @@ export interface Characteristics {
 }
 export const CONTROL: Characteristics = { write: UUIDs.controlWrite, notify: UUIDs.controlNotify };
 export const FALLBACK: Characteristics = { write: UUIDs.fallbackWrite, notify: UUIDs.fallbackNotify };
+export const GO: Characteristics = { write: UUIDs.goWrite, notify: UUIDs.goNotify };
+/** Every write/notify pair the official app knows, in the order it prefers them. */
+export const characteristicSets: Characteristics[] = [CONTROL, FALLBACK, GO];
 
 // ---- Enumerations ---------------------------------------------------------
 
