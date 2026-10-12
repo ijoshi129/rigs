@@ -64,7 +64,7 @@ export function ConnectScreen() {
         )}
       </Glass>
 
-      <p className="mt-6 text-[12px] font-medium text-ink-3 leading-relaxed">Nothing leaves your phone. No account, no cloud.{snap.mock && " The rig is simulated right now."}</p>
+      <p className="mt-6 text-[12px] font-medium text-ink-3 leading-relaxed">Nothing leaves your phone. No account, no cloud.{snap.mock && " The rig is simulated right now."} · v{__APP_VERSION__}</p>
     </Screen>
   );
 }
