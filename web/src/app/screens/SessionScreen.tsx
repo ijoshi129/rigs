@@ -90,7 +90,10 @@ export function SessionScreen() {
       </div>
       {slot.error && <p className="mt-4 text-center text-[13px] font-semibold text-red-400">{slot.error}</p>}
       {!state.connected && (
-        <div className="mt-6 flex justify-center"><GlassButton onClick={() => navigate("/connect")}>Reconnect</GlassButton></div>
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <GlassButton onClick={() => navigate("/connect")}>{snap.connecting ? "Reconnecting…" : "Reconnect"}</GlassButton>
+          {snap.connecting && <span className="text-[13px] font-medium text-ink-2">Trying to reach the rig. Make sure it's on and pairing is enabled.</span>}
+        </div>
       )}
     </Screen>
   );

@@ -64,7 +64,14 @@ export function ConnectScreen() {
         )}
       </Glass>
 
-      <p className="mt-6 text-[12px] font-medium text-ink-3 leading-relaxed">Nothing leaves your phone. No account, no cloud.{snap.mock && " The rig is simulated right now."} · v{__APP_VERSION__}</p>
+      {snap.bluetoothAvailable && !snap.mock && (
+        <p className="mt-5 px-1.5 text-[12px] font-medium text-ink-3 leading-relaxed">
+          {store.canRemember
+            ? "This browser remembers the rig: next time, the app reconnects on its own when the rig is on and nearby."
+            : "This browser can't remember devices between visits, so you'll tap Connect and pick the rig each time you open the app. While the app is open, it reconnects on its own if the link drops."}
+        </p>
+      )}
+      <p className="mt-4 text-[12px] font-medium text-ink-3 leading-relaxed">Nothing leaves your phone. No account, no cloud.{snap.mock && " The rig is simulated right now."} · v{__APP_VERSION__}</p>
     </Screen>
   );
 }

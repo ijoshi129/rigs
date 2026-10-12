@@ -59,6 +59,10 @@ class RigStore {
   private simulator?: Switch2Simulator;
   private wasHeating = false;
   private open?: HistoryEntry;
+  /** The browser device we last connected, kept so we can reconnect without the picker. */
+  private lastDevice?: BluetoothDevice;
+  private forgotten = false;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
     const params = new URLSearchParams(location.search);
@@ -125,7 +129,10 @@ class RigStore {
   }
 
   private async connectDevice(device: BluetoothDevice) {
+    this.lastDevice = device;
+    this.forgotten = false;
     const transport = new WebBluetoothTransport(device);
+    transport.onDisconnect(() => this.scheduleReconnect());
     await transport.open(Switch2.optionalServices);
     const chars = Switch2.characteristicSets.find((c) => transport.has(c.notify) && transport.has(c.write));
     if (!chars) {
@@ -140,21 +147,48 @@ class RigStore {
     await dev.connect();
   }
 
+  /** True when this browser can reconnect a remembered rig without the picker. */
+  get canRemember(): boolean {
+    return this.snap.bluetoothAvailable && typeof (navigator.bluetooth as { getDevices?: unknown }).getDevices === "function";
+  }
+
   /** Reconnects the rig used last time, if the browser supports remembered devices. */
   async reconnectRemembered() {
-    if (!this.snap.bluetoothAvailable || !("getDevices" in navigator.bluetooth) || this.snap.rig) return;
+    if (!this.canRemember || this.snap.rig) return;
     const id = localStorage.getItem(REMEMBERED_KEY);
     if (!id) return;
     let devices: BluetoothDevice[];
     try { devices = await navigator.bluetooth.getDevices(); } catch { return; }
     const device = devices.find((d) => d.id === id);
     if (!device) return;
+    this.lastDevice = device;
+    await this.tryReconnect();
+  }
+
+  /** One reconnect attempt to the remembered device; keeps retrying while the page is open. */
+  private async tryReconnect() {
+    const device = this.lastDevice;
+    if (!device || this.snap.rig?.state.connected || this.forgotten) return;
     this.set({ connecting: true });
-    try { await this.connectDevice(device); } catch { /* not in range */ }
-    this.set({ connecting: false });
+    try {
+      await this.connectDevice(device);
+      this.set({ connecting: false, error: undefined });
+    } catch {
+      this.set({ connecting: false });
+      this.scheduleReconnect(4000);
+    }
+  }
+
+  private scheduleReconnect(delay = 1500) {
+    if (this.forgotten || this.snap.mock) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => void this.tryReconnect(), delay);
   }
 
   async disconnect() {
+    this.forgotten = true;
+    clearTimeout(this.reconnectTimer);
+    this.lastDevice = undefined;
     await this.snap.rig?.device.disconnect();
     this.set({ rig: undefined });
     localStorage.removeItem(REMEMBERED_KEY);
