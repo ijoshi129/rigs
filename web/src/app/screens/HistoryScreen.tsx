@@ -1,19 +1,18 @@
-import { PeakProIcon, Switch2Icon } from "../devices";
 import { formatTemp, useSettings } from "../settings";
-import { type HistoryEntry, rigName, store, useRigs } from "../store";
+import { type HistoryEntry, store, useRig } from "../store";
 import { Glass, Screen, SectionLabel } from "../ui";
 
 const dayKey = (t: number) => new Date(t).toDateString();
 const timeOf = (t: number) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 export function HistoryScreen() {
-  const snap = useRigs();
+  const snap = useRig();
   const s = useSettings();
   const h = snap.history;
   const today = h.filter((e) => dayKey(e.start) === dayKey(Date.now()));
   const targets = h.map((e) => e.targetF).filter((v): v is number => v !== undefined).sort((a, b) => a - b);
   const usual = targets.length ? targets[Math.floor(targets.length / 2)] : undefined;
-  const lifetime = snap.switch2?.state.analytics.totalHeatingCycles ?? snap.peakPro?.state.totalDabs;
+  const lifetime = snap.rig?.state.analytics.totalHeatingCycles;
 
   // Last seven days, oldest first.
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
@@ -52,9 +51,9 @@ export function HistoryScreen() {
                   <span className="text-[13px] font-semibold text-ink-2 w-[62px] tnum">{timeOf(e.start)}</span>
                   <span className="rounded-face text-[24px] font-extrabold w-[62px] tnum">{e.targetF !== undefined ? `${formatTemp(e.targetF, s.units)}°` : "—"}</span>
                   <span className="flex flex-col flex-1 min-w-0">
-                    <span className="text-[15px] font-semibold flex items-center gap-1.5"><span className="text-ink/70">{e.rig === "switch2" ? <Switch2Icon size={16} /> : <PeakProIcon size={16} />}</span>{rigName[e.rig]}{e.profile ? ` · ${e.profile}` : ""}</span>
+                    <span className="text-[15px] font-semibold">{e.profile ?? "Session"}</span>
                     <span className="text-[12px] font-medium text-ink-2">
-                      {[e.holdS ? `${e.holdS} s` : undefined, e.peakF ? `peaked ${formatTemp(e.peakF, s.units)}°` : undefined, e.extended ? "extended" : undefined, e.boosted ? "boosted" : undefined].filter(Boolean).join(" · ")}
+                      {[e.holdS ? `${e.holdS} s hold` : undefined, e.peakF ? `peaked ${formatTemp(e.peakF, s.units)}°` : undefined, e.extended ? "extended" : undefined].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                 </div>

@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hex, encF32, encI32, encU32, leF32, sleep } from "../transport";
+import { sleep } from "../transport";
 import * as Switch2 from "../switch2/protocol";
 import { applyMessage, initialDumpComplete, initialSwitch2State, curvePoints } from "../switch2/state";
 import { Switch2Device } from "../switch2/device";
-import * as Lorax from "../lorax/protocol";
-import { PeakProDevice } from "../lorax/device";
 import { MockTransport } from "../mock/mockTransport";
 import { Switch2Simulator } from "../mock/switch2Simulator";
-import { PeakProSimulator } from "../mock/peakProSimulator";
 
 const arr = (d: Uint8Array) => Array.from(d);
 
@@ -102,56 +99,6 @@ describe("Switch 2 messages", () => {
   });
 });
 
-describe("Lorax", () => {
-  it("framing", () => {
-    expect(arr(Lorax.packCommand(0x0102, 16, new Uint8Array([9])))).toEqual([0x02, 0x01, 16, 9]);
-    const r = Lorax.unpackReply(new Uint8Array([0x02, 0x01, 0, 0xaa, 0xbb]));
-    expect(r.seq).toBe(0x0102);
-    expect(r.status).toBe(0);
-    expect(arr(r.payload)).toEqual([0xaa, 0xbb]);
-    expect(() => Lorax.unpackReply(new Uint8Array([1, 2]))).toThrow();
-  });
-
-  it("short payloads", () => {
-    expect(arr(Lorax.readShortPayload("/p/bat/soc", 240))).toEqual([0, 0, 240, 0, ...Array.from(new TextEncoder().encode("/p/bat/soc"))]);
-    expect(arr(Lorax.writeShortPayload("/p/app/mc", new Uint8Array([7])))).toEqual([0, 0, 0, ...Array.from(new TextEncoder().encode("/p/app/mc")), 0, 7]);
-  });
-
-  it("auth token vectors", async () => {
-    expect(hex(await Lorax.authToken(new Uint8Array(16)))).toBe("b38af858578966e2c28e5afbdca34add");
-    expect(hex(await Lorax.authToken(new Uint8Array(Array.from({ length: 16 }, (_, i) => i))))).toBe("cc4af4246a24eb8bb512bc7dc5157b9c");
-    await expect(Lorax.authToken(new Uint8Array([1, 2, 3]))).rejects.toThrow();
-  });
-
-  it("codecs", () => {
-    expect(Lorax.Codec.fahrenheit(encF32(260))).toBeCloseTo(500);
-    expect(Lorax.Codec.fahrenheit(encI32(2600))).toBeCloseTo(500);
-    expect(Lorax.Codec.fahrenheit(new Uint8Array([1, 2]))).toBeUndefined();
-    expect(Lorax.Codec.battery(new Uint8Array([64]))).toBe(64);
-    expect(Lorax.Codec.battery(encU32(64))).toBe(64);
-    expect(Lorax.Codec.battery(encF32(64))).toBe(64);
-    expect(Lorax.Codec.count(encU32(1342))).toBe(1342);
-    expect(Lorax.Codec.count(encF32(1342))).toBe(1342);
-    expect(Lorax.Codec.seconds(encU32(45))).toBe(45);
-    expect(Lorax.Codec.seconds(encF32(45))).toBe(45);
-    expect(Lorax.Codec.seconds(encU32(45_000), 300)).toBe(45);
-  });
-
-  it("firmware letters", () => {
-    expect(Lorax.Codec.firmwareLetters(1)).toBe("A");
-    expect(Lorax.Codec.firmwareLetters(21)).toBe("Z");
-    expect(Lorax.Codec.firmwareLetters(22)).toBe("AA");
-    expect(Lorax.Codec.firmwareLetters(28)).toBe("AG");
-    expect(Lorax.Codec.firmwareLetters(0)).toBe("X*");
-  });
-
-  it("color round trip", () => {
-    const c: Lorax.Color = { red: 10, green: 20, blue: 30, mode: 5 };
-    expect(arr(Lorax.encodeColor(c))).toEqual([10, 20, 30, 0, 5, 0, 0, 0]);
-    expect(Lorax.decodeColor(Lorax.encodeColor(c))).toEqual(c);
-  });
-});
-
 const until = async (cond: () => boolean, ms = 3000) => {
   const end = Date.now() + ms;
   while (!cond()) {
@@ -192,63 +139,5 @@ describe("Switch 2 device against simulator", () => {
   it("settings need a status first", async () => {
     const dev = new Switch2Device(new MockTransport());
     await expect(dev.startSession()).rejects.toThrow();
-  });
-});
-
-describe("Peak Pro device against simulator", () => {
-  it("handshake then session", async () => {
-    const sim = new PeakProSimulator();
-    sim.speed = 50;
-    const dev = new PeakProDevice(sim.transport);
-    await dev.connect();
-    const s = dev.state;
-    expect(s.authenticated).toBe(true);
-    expect(s.name).toBe("Peak Pro");
-    expect(s.model).toBe("Peak Pro");
-    expect(s.firmware).toBe("AG");
-    expect(s.profiles[1]!.name).toBe("Medium");
-    expect(s.profiles[1]!.fahrenheit).toBeCloseTo(500);
-    expect(s.profiles[1]!.seconds).toBe(60);
-    expect(s.activeProfile).toBe(1);
-    expect(s.batteryPercent).toBe(64);
-    expect(s.chamberType).toBe(4);
-    expect(s.totalDabs).toBe(1342);
-
-    await dev.startSession();
-    expect(Lorax.isHeatingState(dev.state.operatingState)).toBe(true);
-    for (let i = 0; i < 200 && dev.state.operatingState !== 8; i++) {
-      await dev.refreshFast();
-      await sleep(5);
-    }
-    expect(dev.state.operatingState).toBe(8);
-    expect(dev.state.temperatureFahrenheit!).toBeGreaterThan(490);
-    expect(dev.state.totalSeconds).toBe(60);
-
-    await dev.stopSession();
-    expect([9, 5]).toContain(dev.state.operatingState);
-
-    await dev.setProfileTemperature(0, 460);
-    expect(leF32(sim.value(Lorax.Path.profileTemperature(0))!)).toBeCloseTo(237.78, 1);
-    await dev.setLantern(true, { red: 255, green: 0, blue: 0, mode: 1 });
-    expect(arr(sim.value(Lorax.Path.lanternCommand)!)).toEqual([1]);
-    expect(leF32(sim.value(Lorax.Path.lanternTime)!)).toBe(7200);
-    sim.stop();
-    await dev.disconnect();
-  });
-
-  it("wrong key is refused", async () => {
-    const sim = new PeakProSimulator();
-    const inner = sim.transport;
-    const tampered = new MockTransport();
-    tampered.onRead = (c) => inner.read(c);
-    tampered.onWrite = async (c, d) => {
-      const b = new Uint8Array(d);
-      if (b.length > 3 && b[2] === Lorax.Opcode.unlockAccess) b[3]! ^= 0xff;
-      await inner.write(c, b);
-    };
-    await inner.subscribe(Lorax.UUIDs.reply, (d) => tampered.emit(Lorax.UUIDs.reply, d));
-    const dev = new PeakProDevice(tampered);
-    await expect(dev.connect()).rejects.toMatchObject({ kind: "authenticationFailed", status: 1 });
-    expect(dev.state.authenticated).toBe(false);
   });
 });

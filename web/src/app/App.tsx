@@ -20,7 +20,7 @@ export function App() {
   let screen;
   switch (route.name) {
     case "presets": screen = <PresetsScreen />; break;
-    case "preset": screen = <PresetEditScreen id={route.id} />; break;
+    case "preset": screen = <PresetEditScreen index={route.index} />; break;
     case "lights": screen = <LightsScreen />; break;
     case "history": screen = <HistoryScreen />; break;
     case "appearance": screen = <AppearanceScreen />; break;

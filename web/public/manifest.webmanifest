@@ -1,7 +1,7 @@
 {
   "name": "Rigs",
   "short_name": "Rigs",
-  "description": "Control a Dr. Dabber Switch 2 and a Puffco Peak Pro from one screen over Bluetooth.",
+  "description": "Control a Dr. Dabber Switch 2 from your phone over Bluetooth.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

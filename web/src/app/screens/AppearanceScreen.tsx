@@ -1,10 +1,10 @@
 import { settings, useSettings, wallpapers } from "../settings";
-import { useRigs } from "../store";
+import { useRig } from "../store";
 import { Glass, Row, Screen, SectionLabel, Segmented, Toggle } from "../ui";
 
 export function AppearanceScreen() {
   const s = useSettings();
-  const snap = useRigs();
+  const snap = useRig();
   const set = settings.update.bind(settings);
 
   return (
@@ -22,7 +22,7 @@ export function AppearanceScreen() {
           <span className="text-[22px] font-semibold">+</span>
         </Swatch>
       </div>
-      <p className="mt-2 px-1.5 text-[12px] font-medium text-ink-3">"Rig" follows whatever light mode the rig is showing{snap.switch2 || snap.peakPro ? "" : ", once one is connected"}.</p>
+      <p className="mt-2 px-1.5 text-[12px] font-medium text-ink-3">"Rig" follows whatever light mode the rig is showing{snap.rig ? "" : ", once it's connected"}.</p>
 
       {s.wallpaper === "custom" && (
         <Glass className="mt-3 px-[18px]">
@@ -51,13 +51,12 @@ export function AppearanceScreen() {
         </Row>
       </Glass>
 
-      <SectionLabel>Rigs</SectionLabel>
+      <SectionLabel>Rig</SectionLabel>
       <Glass className="px-[18px]">
-        <Row title="Switch 2" detail={snap.switch2 ? "Connected" : "Not connected"} ><a href="#/connect" className="glass pressable h-9 px-4 rounded-full text-[14px] font-bold flex items-center no-underline">Manage</a></Row>
-        <Row title="Peak Pro" detail={snap.peakPro ? "Connected" : "Not connected"} last><a href="#/connect" className="glass pressable h-9 px-4 rounded-full text-[14px] font-bold flex items-center no-underline">Manage</a></Row>
+        <Row title="Switch 2" detail={snap.rig ? (snap.rig.state.connected ? "Connected" : "Disconnected") : "Not connected"} last><a href="#/connect" className="glass pressable h-9 px-4 rounded-full text-[14px] font-bold flex items-center no-underline">Manage</a></Row>
       </Glass>
 
-      <p className="mt-6 px-1.5 text-[12px] font-medium text-ink-3 leading-relaxed">Rigs {__APP_VERSION__} · <a href="https://github.com/ijoshi129/rigs" className="underline">Source on GitHub</a>{snap.mock && " · simulated rigs"}</p>
+      <p className="mt-6 px-1.5 text-[12px] font-medium text-ink-3 leading-relaxed">Rigs {__APP_VERSION__} · <a href="https://github.com/ijoshi129/rigs" className="underline">Source on GitHub</a>{snap.mock && " · simulated rig"}</p>
     </Screen>
   );
 }

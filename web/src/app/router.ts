@@ -4,8 +4,7 @@ import { useSyncExternalStore } from "react";
 export type Route =
   | { name: "session" }
   | { name: "presets" }
-  /** `id` is s1–s5 for the Switch 2's presets, p0–p3 for Peak Pro profiles. */
-  | { name: "preset"; id: string }
+  | { name: "preset"; index: number }
   | { name: "lights" }
   | { name: "history" }
   | { name: "appearance" }
@@ -14,7 +13,7 @@ export type Route =
 function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   switch (parts[0]) {
-    case "presets": return parts[1] ? { name: "preset", id: parts[1] } : { name: "presets" };
+    case "presets": return parts[1] ? { name: "preset", index: Number(parts[1]) } : { name: "presets" };
     case "lights": return { name: "lights" };
     case "history": return { name: "history" };
     case "appearance": return { name: "appearance" };
