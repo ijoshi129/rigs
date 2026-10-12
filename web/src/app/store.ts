@@ -91,15 +91,30 @@ class RigStore {
 
   // ---- Real Bluetooth ---------------------------------------------------------
 
-  /** Opens the browser's device picker and connects the Switch 2. */
-  async connect() {
+  /**
+   * Opens the browser's device picker and connects the Switch 2.
+   * `everything` lists every nearby device instead of filtering, for rigs
+   * that advertise under an unexpected name or service.
+   */
+  async connect(everything = false) {
     if (this.snap.connecting) return;
     this.set({ connecting: true, error: undefined });
     try {
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [Switch2.UUIDs.controlService] }],
-        optionalServices: Switch2.optionalServices,
-      });
+      const device = await navigator.bluetooth.requestDevice(
+        everything
+          ? { acceptAllDevices: true, optionalServices: Switch2.optionalServices }
+          : {
+              filters: [
+                { services: [Switch2.UUIDs.controlService] },
+                { services: [Switch2.UUIDs.fallbackService] },
+                { namePrefix: "Switch" },
+                { namePrefix: "SW2" },
+                { namePrefix: "Dr" },
+                { namePrefix: "DD" },
+              ],
+              optionalServices: Switch2.optionalServices,
+            },
+      );
       await this.connectDevice(device);
       localStorage.setItem(REMEMBERED_KEY, device.id);
     } catch (e) {
@@ -112,6 +127,10 @@ class RigStore {
   private async connectDevice(device: BluetoothDevice) {
     const transport = new WebBluetoothTransport(device);
     await transport.open(Switch2.optionalServices);
+    if (!transport.has(Switch2.UUIDs.controlNotify) && !transport.has(Switch2.UUIDs.fallbackNotify)) {
+      await transport.disconnect();
+      throw new Error(`"${device.name ?? "that device"}" doesn't speak the Switch 2 protocol.`);
+    }
     const chars = transport.has(Switch2.UUIDs.controlNotify) ? Switch2.CONTROL : Switch2.FALLBACK;
     const dev = new Switch2Device(transport, chars);
     this.attach(dev, device.name ?? "Switch 2");

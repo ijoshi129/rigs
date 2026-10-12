@@ -55,7 +55,13 @@ export function ConnectScreen() {
 
       <Glass className="mt-5 p-4" radius={22}>
         <div className="text-[14px] font-bold">Rig not showing up?</div>
-        <p className="mt-1 text-[13px] font-medium text-ink-2 leading-relaxed">Hold + and − together for 3 seconds to turn pairing on. The rig flashes and buzzes once. Pairing off saves battery, so it may have turned itself off.</p>
+        <p className="mt-1 text-[13px] font-medium text-ink-2 leading-relaxed">
+          Hold + and − together for 3 seconds to turn pairing on. The rig flashes and buzzes once. Pairing off saves battery, so it may have turned itself off.
+          Make sure the Dr. Dabber app is fully closed on every device, and that this browser is allowed to use Bluetooth in your system settings.
+        </p>
+        {!snap.rig && snap.bluetoothAvailable && !snap.mock && (
+          <button type="button" disabled={snap.connecting} onClick={() => void store.connect(true)} className="mt-3 text-[13px] font-semibold underline text-ink">Show every nearby device</button>
+        )}
       </Glass>
 
       <p className="mt-6 text-[12px] font-medium text-ink-3 leading-relaxed">Nothing leaves your phone. No account, no cloud.{snap.mock && " The rig is simulated right now."}</p>
