@@ -22,9 +22,9 @@ export class WebBluetoothTransport implements BLETransport {
     this.services.length = 0;
     for (const uuid of services) {
       try {
-        const service = await server.getPrimaryService(uuid);
+        const service = await server.getPrimaryService(uuid.toLowerCase());
         this.services.push(uuid);
-        for (const c of await service.getCharacteristics()) this.chars.set(c.uuid, c);
+        for (const c of await service.getCharacteristics()) this.chars.set(c.uuid.toLowerCase(), c);
       } catch {
         // Service absent on this device; fine.
       }
@@ -36,11 +36,11 @@ export class WebBluetoothTransport implements BLETransport {
   }
 
   has(characteristic: string) {
-    return this.chars.has(characteristic);
+    return this.chars.has(characteristic.toLowerCase());
   }
 
   private char(uuid: string) {
-    const c = this.chars.get(uuid);
+    const c = this.chars.get(uuid.toLowerCase());
     if (!c) throw new RigKitError(this.device.gatt?.connected ? "unsupported" : "notConnected", `characteristic ${uuid}`);
     return c;
   }
