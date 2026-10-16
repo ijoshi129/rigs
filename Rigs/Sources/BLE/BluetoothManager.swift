@@ -23,6 +23,8 @@ final class BluetoothManager: NSObject {
     private(set) var nearby: [DiscoveredPeripheral] = []
     private(set) var isSearching = false
     private(set) var isReconnecting = false
+    /// The rig's name from when it's found until it's set up, for the connect screen.
+    private(set) var connectingTo: String?
     var lastError: String?
 
     private(set) var controller: Switch2Controller?
@@ -63,6 +65,11 @@ final class BluetoothManager: NSObject {
             lastError = bluetoothState == .unauthorized
                 ? "Rigs isn't allowed to use Bluetooth. Turn it on in Settings › Rigs."
                 : "Bluetooth is off. Turn it on in Control Center."
+            return
+        }
+        // A second tap while the link opens would start a scan nobody stops.
+        guard connectingTo == nil, transport == nil else {
+            diag.record(.app, "search ignored: already connecting")
             return
         }
         stopSearch()
@@ -117,6 +124,7 @@ final class BluetoothManager: NSObject {
         forgotten = true
         diag.record(.app, "rig forgotten")
         rememberedID = nil
+        Switch2Controller.forgetSnapshot()
         stopSearch()
         isReconnecting = false
         if let p = peripheral { central.cancelPeripheralConnection(p) }
@@ -130,6 +138,8 @@ final class BluetoothManager: NSObject {
 
     private func connectAndSetUp(_ p: CBPeripheral, userInitiated: Bool) async {
         peripheral = p
+        if userInitiated { connectingTo = p.name ?? "your rig" }
+        defer { connectingTo = nil }
         diag.record(.ble, "connecting to \(p.name ?? "unnamed") \(Self.short(p.identifier))\(userInitiated ? "" : " (background)")")
         let t = PeripheralTransport(peripheral: p, central: central)
         transport = t
@@ -153,7 +163,7 @@ final class BluetoothManager: NSObject {
             }
             diag.record(.ble, "using \(Diagnostics.name(chars.write)) / \(Diagnostics.name(chars.notify))")
             let device = Switch2Device(transport: LoggingTransport(t), characteristics: chars)
-            let ctl = controller ?? Switch2Controller(name: p.name ?? "Switch 2", log: log)
+            let ctl = controller ?? Switch2Controller(name: p.name ?? "Switch 2", log: log, remembers: true)
             ctl.attach(device)
             controller = ctl
             try await device.connect()

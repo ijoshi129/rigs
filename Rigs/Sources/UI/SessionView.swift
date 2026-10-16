@@ -101,7 +101,7 @@ struct SessionView: View {
         if !rig.connected {
             line = model.isReconnecting ? "Reconnecting…" : "Disconnected"
         } else if s == nil {
-            line = "Waiting for the rig"
+            line = "Reading settings…"
         } else if rig.isHeating {
             if let t = target, let f = rig.temperatureF, f < t - 5 { line = "Heating to \(formatTemp(t, units))°" } else { line = "Holding" }
             if let r = s?.sessionSecondsRemaining, r > 0 { detail = "\(r) s left" }

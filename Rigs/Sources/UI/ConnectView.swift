@@ -6,7 +6,10 @@ struct ConnectView: View {
     @State private var showHelp = DebugLaunch.open == "help"
     @State private var breathe = false
 
+    private var busy: Bool { model.isSearching || model.connectingTo != nil }
+
     private var line: String {
+        if let name = model.connectingTo { return "Connecting to \(name)…" }
         if let e = model.error { return e }
         if model.isSearching { return "Looking for your rig…" }
         return "Turn it on, then press the button."
@@ -57,12 +60,12 @@ struct ConnectView: View {
 
                     Button { model.connect() } label: {
                         HStack(spacing: 16) {
-                            RingButton(enabled: !model.isSearching) { PowerGlyph() }
-                            Text(model.isSearching ? "Searching…" : "Connect").font(.geist(18))
+                            RingButton(enabled: !busy) { PowerGlyph() }
+                            Text(model.connectingTo != nil ? "Connecting…" : model.isSearching ? "Searching…" : "Connect").font(.geist(18))
                         }
                     }
                     .buttonStyle(.pressable)
-                    .disabled(model.isSearching)
+                    .disabled(busy)
                     .padding(.top, 32)
                     .sensoryFeedback(.impact(weight: .medium), trigger: model.isSearching) { _, new in new }
                 }
@@ -71,7 +74,7 @@ struct ConnectView: View {
             }
         }
         .background(Theme.background)
-        .onChange(of: model.isSearching, initial: true) { _, searching in
+        .onChange(of: busy, initial: true) { _, searching in
             withAnimation(searching ? .easeInOut(duration: 1.6).repeatForever() : .easeOut(duration: 0.4)) { breathe = searching }
         }
         .sheet(isPresented: $showHelp) { HelpSheet() }

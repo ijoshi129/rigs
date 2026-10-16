@@ -2,6 +2,43 @@ import Foundation
 import Observation
 import RigKit
 
+/// What the rig told us last time, shown while it resends everything on
+/// connect (about six seconds on a real Switch 2).
+struct RigSnapshot: Codable, Equatable {
+    var name: String?
+    var presets: [Switch2.Preset]
+    var activePreset: Int?
+    var firmwareVersion: String?
+    var secondaryVersion: String?
+    var analytics: Switch2.Analytics
+
+    init(_ s: Switch2.State) {
+        name = s.name
+        presets = s.presets
+        activePreset = s.status?.activePreset ?? s.activePreset
+        firmwareVersion = s.firmwareVersion
+        secondaryVersion = s.secondaryVersion
+        analytics = s.analytics
+    }
+
+    /// Live values win; anything the rig hasn't resent yet comes from here.
+    /// Status is never filled in: an old temperature would be wrong.
+    func underlay(_ live: Switch2.State) -> Switch2.State {
+        var m = live
+        m.name = live.name ?? name
+        m.activePreset = live.activePreset ?? activePreset
+        m.firmwareVersion = live.firmwareVersion ?? firmwareVersion
+        m.secondaryVersion = live.secondaryVersion ?? secondaryVersion
+        if m.analytics == Switch2.Analytics() { m.analytics = analytics }
+        for (i, old) in presets.enumerated() where m.presets.indices.contains(i) {
+            if m.presets[i].fahrenheit == nil { m.presets[i].fahrenheit = old.fahrenheit; m.presets[i].celsius = old.celsius }
+            if m.presets[i].holdSeconds == nil { m.presets[i].holdSeconds = old.holdSeconds }
+            if m.presets[i].profile == nil { m.presets[i].profile = old.profile; m.presets[i].curve = old.curve }
+        }
+        return m
+    }
+}
+
 /// Main-actor view of the Switch 2. Survives reconnects: each new link
 /// attaches a fresh `Switch2Device`, and the screens keep reading from here.
 @MainActor @Observable
@@ -15,10 +52,25 @@ final class Switch2Controller {
     private let log: SessionLog
     private let liveActivity = LiveActivityController()
     private var task: Task<Void, Never>?
+    private let remembers: Bool
+    private var snapshot: RigSnapshot?
+    private static let snapshotKey = "rigs.lastState"
 
-    init(name: String, log: SessionLog) {
+    /// `remembers` saves what the rig reports and shows it on the next
+    /// connect until the rig resends it. The simulated rig doesn't.
+    init(name: String, log: SessionLog, remembers: Bool = false) {
         advertisedName = name
         self.log = log
+        self.remembers = remembers
+        if remembers, let data = UserDefaults.standard.data(forKey: Self.snapshotKey) {
+            snapshot = try? JSONDecoder().decode(RigSnapshot.self, from: data)
+            if let snapshot { state = snapshot.underlay(state) }
+        }
+    }
+
+    /// Forgetting the rig drops what we saved about it.
+    static func forgetSnapshot() {
+        UserDefaults.standard.removeObject(forKey: snapshotKey)
     }
 
     /// Starts listening to a newly connected device. Call before `device.connect()`.
@@ -41,13 +93,25 @@ final class Switch2Controller {
 
     private func apply(_ s: Switch2.State, from source: Switch2Device) {
         guard source === device else { return }
-        state = s
+        if s.initialDumpComplete {
+            state = s
+            if remembers { save(s) }
+        } else {
+            state = snapshot?.underlay(s) ?? s
+        }
         guard let status = s.status else { return }
         liveActivity.update(s, rigName: name)
         log.track(heating: status.sessionActive, fahrenheit: status.temperatureFahrenheit) {
             let p = s.activePresetSettings
             return (p?.fahrenheit, p?.profile?.name, p?.holdSeconds, status.sessionExtend > 0)
         }
+    }
+
+    private func save(_ s: Switch2.State) {
+        let fresh = RigSnapshot(s)
+        guard fresh != snapshot else { return }
+        snapshot = fresh
+        UserDefaults.standard.set(try? JSONEncoder().encode(fresh), forKey: Self.snapshotKey)
     }
 
     // MARK: Derived

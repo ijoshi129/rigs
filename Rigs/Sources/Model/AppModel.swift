@@ -34,6 +34,7 @@ final class AppModel {
     var rig: Switch2Controller? { isMock ? mockRig : bluetooth?.controller }
     var isSearching: Bool { isMock ? mockConnecting : bluetooth?.isSearching ?? false }
     var isReconnecting: Bool { bluetooth?.isReconnecting ?? false }
+    var connectingTo: String? { bluetooth?.connectingTo }
     var error: String? { isMock ? nil : bluetooth?.lastError }
 
     func connect() {
