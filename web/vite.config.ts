@@ -15,7 +15,7 @@ export default defineConfig({
       manifest: false, // public/manifest.webmanifest is hand-written
       includeAssets: ["icon.svg", "icon-180.png", "icon-512.png"],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,woff2}"],
         navigateFallback: "index.html",
         runtimeCaching: [
           {

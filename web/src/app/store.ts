@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Switch2, Switch2Device, Switch2Simulator, type Switch2State, activePresetOf } from "../rigkit";
 import { WebBluetoothTransport } from "../ble/webBluetoothTransport";
-import { settings } from "./settings";
 
 export interface Sample {
   t: number;
@@ -41,7 +40,7 @@ const MAX_HISTORY = 900;
 const REMEMBERED_KEY = "rigs.remembered";
 const LOG_KEY = "rigs.history";
 
-/** The Switch 2's LED modes as wallpaper color pairs, used by the "Rig" wallpaper. */
+/** The Switch 2's LED modes as color pairs, for the swatches on the Lights screen. */
 export const lightModeColors: Record<number, [string, string]> = {
   0: ["#3a3f4a", "#1d2430"], 1: ["#d9d4c7", "#8a8577"], 2: ["#8a3ffc", "#4a1d8a"], 3: ["#2f6bff", "#1d2f8a"],
   4: ["#22c7e6", "#0f4d5a"], 5: ["#3ccf6a", "#0f4d3a"], 6: ["#f4d13d", "#8a6b0f"], 7: ["#ff8a2b", "#8a3a0f"],
@@ -192,7 +191,6 @@ class RigStore {
     await this.snap.rig?.device.disconnect();
     this.set({ rig: undefined });
     localStorage.removeItem(REMEMBERED_KEY);
-    settings.setRigColors(null);
   }
 
   // ---- The rig ----------------------------------------------------------------
@@ -210,9 +208,6 @@ class RigStore {
         const p = activePresetOf(state);
         return { targetF: p?.fahrenheit, profile: Switch2.profileName(p?.profile) || undefined, holdS: p?.holdSeconds, extended: (st?.sessionExtend ?? 0) > 0 };
       });
-      const code = st?.lightMode;
-      const pair = code !== undefined ? lightModeColors[code] : undefined;
-      settings.setRigColors(pair ? { a: pair[0], b: pair[1], c: pair[1] } : null);
     });
   }
 

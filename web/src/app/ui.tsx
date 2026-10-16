@@ -1,21 +1,11 @@
 import type { ReactNode } from "react";
 import { back, navigate, useRoute } from "./router";
 
-export function Wallpaper() {
-  return (
-    <div className="wallpaper" aria-hidden="true">
-      <div className="blob blob-a" />
-      <div className="blob blob-b" />
-      <div className="blob blob-c" />
-    </div>
-  );
-}
-
 export function Screen({ children, title, subtitle, backTo, action }: {
   children: ReactNode; title?: string; subtitle?: string; backTo?: string; action?: ReactNode;
 }) {
   return (
-    <main className="relative z-10 mx-auto max-w-[520px] min-h-full px-5 pt-5 pb-[128px]">
+    <main className="relative z-10 mx-auto max-w-[520px] min-h-full px-5 pb-[120px]" style={{ paddingTop: "calc(16px + env(safe-area-inset-top))" }}>
       {title && (
         <header className="flex items-center gap-3 mb-5">
           {backTo !== undefined && (
@@ -24,8 +14,8 @@ export function Screen({ children, title, subtitle, backTo, action }: {
             </IconButton>
           )}
           <div className="flex flex-col min-w-0">
-            <h1 className="text-[34px] font-extrabold tracking-[-0.02em] leading-none">{title}</h1>
-            {subtitle && <span className="text-[13px] font-semibold text-ink-2 mt-1.5">{subtitle}</span>}
+            <h1 className="text-[34px] font-light tracking-[-0.03em] leading-none">{title}</h1>
+            {subtitle && <span className="text-[14px] text-ink-2 mt-1.5">{subtitle}</span>}
           </div>
           {action && <div className="ml-auto">{action}</div>}
         </header>
@@ -35,7 +25,7 @@ export function Screen({ children, title, subtitle, backTo, action }: {
   );
 }
 
-export function Glass({ children, className = "", radius = 24 }: { children: ReactNode; className?: string; radius?: number }) {
+export function Glass({ children, className = "", radius = 0 }: { children: ReactNode; className?: string; radius?: number }) {
   return (
     <div className={`glass ${className}`} style={{ borderRadius: radius }}>
       {children}
@@ -44,7 +34,7 @@ export function Glass({ children, className = "", radius = 24 }: { children: Rea
 }
 
 export function IconButton({ children, label, onClick, href }: { children: ReactNode; label: string; onClick?: () => void; href?: string }) {
-  const cls = "glass pressable w-11 h-11 rounded-full flex items-center justify-center text-ink shrink-0";
+  const cls = "glass pressable w-10 h-10 flex items-center justify-center text-ink shrink-0";
   if (href) return <a href={href} aria-label={label} className={cls}>{children}</a>;
   return <button type="button" aria-label={label} onClick={onClick} className={cls}>{children}</button>;
 }
@@ -58,7 +48,7 @@ export function GlassButton({ children, onClick, disabled, prominent, className 
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className={`${prominent ? "glass-prominent" : "glass"} pressable rounded-full h-[60px] px-8 text-[18px] font-bold flex items-center justify-center gap-2.5 ${className}`}
+      className={`${prominent ? "glass-prominent" : "glass"} pressable h-[56px] px-8 text-[17px] font-medium flex items-center justify-center gap-2.5 ${className}`}
     >
       {children}
     </button>
@@ -70,7 +60,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
   options: T[]; value: T; onChange: (v: T) => void; disabled?: boolean; render?: (v: T) => ReactNode; onHold?: (v: T) => void;
 }) {
   return (
-    <div className="glass rounded-full p-1 flex gap-0.5 h-14">
+    <div className="glass p-1 flex gap-0.5 h-12">
       {options.map((o) => {
         const active = o === value;
         return (
@@ -82,7 +72,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             onClick={() => onChange(o)}
             onPointerDown={onHold ? (e) => startHold(e, () => onHold(o)) : undefined}
             onContextMenu={onHold ? (e) => e.preventDefault() : undefined}
-            className={`pressable flex-1 rounded-full text-[16px] tnum ${active ? "glass-strong font-bold text-ink" : "font-semibold text-ink-2"} disabled:opacity-50`}
+            className={`pressable flex-1 text-[15px] tnum ${active ? "glass-strong font-medium text-ink" : "text-ink-2"} disabled:opacity-50`}
           >
             {render ? render(o) : String(o)}
           </button>
@@ -109,10 +99,10 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
       aria-checked={on}
       aria-label={label}
       onClick={() => onChange(!on)}
-      className="relative w-[52px] h-8 rounded-full shrink-0 transition-colors"
-      style={{ background: on ? "var(--ok)" : "var(--track)" }}
+      className="relative w-[52px] h-8 shrink-0 transition-colors"
+      style={{ background: on ? "var(--accent)" : "var(--track)" }}
     >
-      <span className="absolute top-0.5 w-7 h-7 rounded-full bg-white shadow-md transition-[left]" style={{ left: on ? 22 : 2 }} />
+      <span className="absolute top-0.5 w-7 h-7 bg-white transition-[left]" style={{ left: on ? 22 : 2 }} />
     </button>
   );
 }
@@ -121,20 +111,20 @@ export function Stepper({ value, onChange, min, max, step = 1, format, label }: 
   value: number; onChange: (v: number) => void; min: number; max: number; step?: number; format?: (v: number) => string; label: string;
 }) {
   return (
-    <div className="flex items-center h-9 p-[3px] rounded-full gap-0.5" style={{ background: "var(--track)" }}>
-      <button type="button" aria-label={`${label}: less`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} className="pressable w-9 h-[30px] rounded-full text-[18px] leading-none disabled:opacity-40">−</button>
-      <span className="rounded-face font-extrabold text-[16px] min-w-[52px] text-center tnum">{format ? format(value) : value}</span>
-      <button type="button" aria-label={`${label}: more`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} className="pressable w-9 h-[30px] rounded-full text-[18px] leading-none disabled:opacity-40">+</button>
+    <div className="flex items-center h-9 p-[3px] gap-0.5" style={{ background: "var(--track)" }}>
+      <button type="button" aria-label={`${label}: less`} disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} className="pressable w-9 h-[30px] text-[18px] leading-none disabled:opacity-40">−</button>
+      <span className="font-medium text-[15px] min-w-[52px] text-center tnum">{format ? format(value) : value}</span>
+      <button type="button" aria-label={`${label}: more`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} className="pressable w-9 h-[30px] text-[18px] leading-none disabled:opacity-40">+</button>
     </div>
   );
 }
 
 export function Row({ title, detail, children, last }: { title: string; detail?: string; children?: ReactNode; last?: boolean }) {
   return (
-    <div className={`flex items-center justify-between gap-4 min-h-[54px] py-2 ${last ? "" : "border-b"}`} style={{ borderColor: "rgba(127,127,127,0.18)" }}>
+    <div className={`flex items-center justify-between gap-4 min-h-[54px] py-2 ${last ? "" : "border-b"}`} style={{ borderColor: "var(--line)" }}>
       <span className="flex flex-col min-w-0">
-        <span className="text-[15px] font-semibold">{title}</span>
-        {detail && <span className="text-[12px] font-medium text-ink-2">{detail}</span>}
+        <span className="text-[15px]">{title}</span>
+        {detail && <span className="text-[12px] text-ink-2">{detail}</span>}
       </span>
       {children}
     </div>
@@ -142,7 +132,7 @@ export function Row({ title, detail, children, last }: { title: string; detail?:
 }
 
 export function SectionLabel({ children }: { children: ReactNode }) {
-  return <div className="text-[13px] font-semibold text-ink-2 px-1.5 mt-5 mb-2">{children}</div>;
+  return <div className="text-[12px] uppercase tracking-[0.1em] text-ink-3 px-1 mt-7 mb-2.5">{children}</div>;
 }
 
 export function TabBar() {
@@ -154,8 +144,8 @@ export function TabBar() {
     { key: "history", label: "History", icon: <ClockIcon />, match: ["history"] },
   ];
   return (
-    <nav aria-label="Main" className="fixed left-0 right-0 z-20 flex justify-center pointer-events-none" style={{ bottom: "calc(14px + env(safe-area-inset-bottom))" }}>
-      <div className="glass rounded-full p-[5px] flex gap-0.5 pointer-events-auto" style={{ borderRadius: 33 }}>
+    <nav aria-label="Main" className="fixed left-0 right-0 bottom-0 z-20 flex justify-center border-t" style={{ background: "rgba(5,6,8,0.92)", borderColor: "var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="w-full max-w-[520px] flex">
         {tabs.map((t) => {
           const active = t.match.includes(route.name);
           return (
@@ -163,8 +153,9 @@ export function TabBar() {
               key={t.key}
               href={`#/${t.key}`}
               aria-current={active ? "page" : undefined}
-              className={`pressable h-14 rounded-full flex flex-col items-center justify-center gap-0.5 text-[11px] no-underline ${active ? "glass-strong px-5 font-bold text-ink" : "px-4 font-semibold text-ink-2"}`}
+              className={`relative flex-1 h-[58px] flex flex-col items-center justify-center gap-1 text-[11px] no-underline ${active ? "text-ink" : "text-ink-3"}`}
             >
+              {active && <span className="absolute top-0 w-8 h-[2px]" style={{ background: "var(--accent)", boxShadow: "0 0 8px var(--accent)" }} />}
               {t.icon}
               {t.label}
             </a>
@@ -188,7 +179,7 @@ export const GearIcon = () => <I size={18}><circle cx="12" cy="12" r="3" /><path
 export const SwapIcon = () => <I size={18}><path d="M7 7h11l-3-3M17 17H6l3 3" /></I>;
 export const ChevronLeft = () => <I size={18}><path d="M15 5l-7 7 7 7" /></I>;
 export const ChevronRight = () => <I size={16}><path d="M9 5l7 7-7 7" /></I>;
-export const StopIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" rx="4" fill="currentColor" /></svg>;
+export const StopIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect width="14" height="14" fill="currentColor" /></svg>;
 export const BoltIcon = () => <I size={18} fill><path d="M13 2 4 14h6l-1 8 9-12h-6z" /></I>;
 
 /** Small glyph of a Switch 2 heating-profile shape. */

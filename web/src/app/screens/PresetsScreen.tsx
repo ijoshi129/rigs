@@ -15,10 +15,10 @@ export function PresetsScreen() {
           {rig.state.presets.slice(1).map((p, i, arr) => {
             const active = p.index === (rig.state.status?.activePreset ?? rig.state.activePreset);
             return (
-              <a key={p.index} href={`#/presets/${p.index}`} className={`flex items-center gap-3.5 px-[18px] py-4 no-underline text-ink ${active ? "glass-strong" : ""} ${i < arr.length - 1 ? "border-b" : ""}`} style={{ borderColor: "rgba(127,127,127,0.18)" }}>
-                <span className="rounded-face text-[30px] font-extrabold tnum w-[72px]">{p.fahrenheit !== undefined ? `${formatTemp(p.fahrenheit, s.units)}°` : "—"}</span>
+              <a key={p.index} href={`#/presets/${p.index}`} className={`flex items-center gap-3.5 px-[18px] py-4 no-underline text-ink ${active ? "glass-strong" : ""} ${i < arr.length - 1 ? "border-b" : ""}`} style={{ borderColor: "var(--line)" }}>
+                <span className="rounded-face text-[30px] font-light tnum w-[72px]">{p.fahrenheit !== undefined ? `${formatTemp(p.fahrenheit, s.units)}°` : "—"}</span>
                 <span className="flex flex-col gap-0.5 flex-1 min-w-0">
-                  <span className="text-[16px] font-semibold flex items-center gap-2">{Switch2.profileName(p.profile) || "Profile"}{active && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full glass-strong">Active</span>}</span>
+                  <span className="text-[16px] font-medium flex items-center gap-2">{Switch2.profileName(p.profile) || "Profile"}{active && <span className="text-[11px] font-medium px-2 py-0.5 glass-strong">Active</span>}</span>
                   <span className="text-[13px] font-medium text-ink-2">{p.holdSeconds ?? "—"} s hold</span>
                 </span>
                 <span className="text-ink/70"><ProfileGlyph code={p.profile} /></span>

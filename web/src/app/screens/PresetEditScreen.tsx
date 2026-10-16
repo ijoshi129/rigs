@@ -30,18 +30,18 @@ export function PresetEditScreen({ index }: { index: number }) {
       title={`Preset ${index}`}
       subtitle={`Switch 2 · button ${index}`}
       backTo="/presets"
-      action={<button type="button" onClick={() => void save()} disabled={saving} className="glass-prominent pressable h-10 px-[18px] rounded-full text-[15px] font-bold">{saving ? "Saving…" : "Save"}</button>}
+      action={<button type="button" onClick={() => void save()} disabled={saving} className="glass-prominent pressable h-10 px-[18px] text-[15px] font-medium">{saving ? "Saving…" : "Save"}</button>}
     >
       <div className="mt-6">
         <div className="flex items-center justify-between">
           <IconButton label="Lower by 5 degrees" onClick={() => setF(Math.max(250, f - 5))}><span className="text-[28px] font-medium leading-none">−</span></IconButton>
           <div className="flex items-baseline gap-1">
-            <span className="rounded-face text-[96px] font-extrabold leading-[0.9] tracking-[-0.04em] tnum">{formatTemp(f, s.units)}</span>
-            <span className="rounded-face text-[26px] font-bold text-ink-2">°{s.units}</span>
+            <span className="rounded-face text-[96px] font-light leading-[0.9] tracking-[-0.04em] tnum">{formatTemp(f, s.units)}</span>
+            <span className="rounded-face text-[26px] font-light text-ink-2">°{s.units}</span>
           </div>
           <IconButton label="Raise by 5 degrees" onClick={() => setF(Math.min(650, f + 5))}><span className="text-[28px] font-medium leading-none">+</span></IconButton>
         </div>
-        <label htmlFor="temp" className="block mt-3.5 text-center text-[13px] font-semibold text-ink-2">
+        <label htmlFor="temp" className="block mt-3.5 text-center text-[13px] font-medium text-ink-2">
           Temperature · {s.units === "F" ? `${Math.round(Temperature.cFromF(f))} °C` : `${Math.round(f)} °F`}
         </label>
         <input id="temp" type="range" min={250} max={650} step={1} value={f} onChange={(e) => setF(Number(e.target.value))} className="mt-1" />
@@ -58,7 +58,7 @@ export function PresetEditScreen({ index }: { index: number }) {
         {Switch2.heatingProfiles.map((p) => {
           const active = p.code === profile;
           return (
-            <button key={p.code} type="button" aria-pressed={active} onClick={() => setProfile(p.code)} className={`${active ? "glass-strong font-extrabold" : "glass font-semibold"} pressable h-[66px] rounded-[18px] flex flex-col items-center justify-center gap-1.5 text-[13px]`}>
+            <button key={p.code} type="button" aria-pressed={active} onClick={() => setProfile(p.code)} className={`${active ? "glass-strong font-medium" : "glass font-medium"} pressable h-[66px] flex flex-col items-center justify-center gap-1.5 text-[13px]`}>
               <ProfileGlyph code={p.code} width={34} />{p.name}
             </button>
           );
@@ -69,7 +69,7 @@ export function PresetEditScreen({ index }: { index: number }) {
         <p className="mt-2 px-1.5 text-[13px] font-medium text-ink-2">Custom curve: {curvePoints(preset).length} points on the rig. Editing the points comes next.</p>
       )}
 
-      {slot.error && <p className="mt-4 text-[13px] font-semibold text-red-400">{slot.error}</p>}
+      {slot.error && <p className="mt-4 text-[13px] font-medium text-red-400">{slot.error}</p>}
       <p className="mt-6 text-center text-[12px] font-medium text-ink-3">Saving writes to the rig, about three seconds. Its button {index} changes with it.</p>
     </Screen>
   );

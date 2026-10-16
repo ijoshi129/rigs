@@ -25,7 +25,7 @@ export function LightsScreen() {
   return (
     <Screen title="Lights" subtitle="Changes apply to the rig instantly">
       <Glass className="px-[18px] py-3.5">
-        <div className="flex justify-between text-[15px] font-semibold"><label htmlFor="bright">Brightness</label><span className="text-ink-2 tnum">{bright}%</span></div>
+        <div className="flex justify-between text-[15px] font-medium"><label htmlFor="bright">Brightness</label><span className="text-ink-2 tnum">{bright}%</span></div>
         <input id="bright" type="range" min={0} max={100} value={bright} disabled={!st} onChange={(e) => { const v = Number(e.target.value); setBright(v); writeBright(v); }} />
         <div className="text-[12px] font-medium text-ink-2">All the way down is stealth: only the power button stays lit.</div>
       </Glass>
@@ -43,7 +43,7 @@ export function LightsScreen() {
               aria-pressed={active}
               disabled={!st}
               onClick={() => run("Light mode", () => device.setLightMode(m.code))}
-              className="pressable aspect-square rounded-full"
+              className="pressable aspect-square"
               style={{ background: m.code <= 9 ? a : `linear-gradient(135deg, ${a}, ${b})`, border: active ? "2px solid var(--ink)" : "1px solid rgba(127,127,127,0.35)", boxShadow: active ? "0 0 0 3px rgba(127,127,127,0.3)" : undefined }}
             />
           );
@@ -59,13 +59,13 @@ export function LightsScreen() {
           <Stepper value={st?.autoShutOffMinutes ?? 0} min={0} max={60} step={5} label="Auto shut-off" format={(v) => (v === 0 ? "Off" : `${v} min`)} onChange={(v) => run("Auto shut-off", () => device.setAutoShutOff(v))} />
         </Row>
         <Row title="Cleaning assist" detail="100° for 30 s to loosen the insert">
-          <button type="button" disabled={!st} onClick={() => run("Cleaning", () => device.setCleaningAssist(!state.cleaningActive))} className="glass pressable h-9 px-4 rounded-full text-[14px] font-bold">{state.cleaningActive ? "Stop" : "Start"}</button>
+          <button type="button" disabled={!st} onClick={() => run("Cleaning", () => device.setCleaningAssist(!state.cleaningActive))} className="glass pressable h-9 px-4 text-[14px] font-medium">{state.cleaningActive ? "Stop" : "Start"}</button>
         </Row>
         <Row title="Name" detail={`${state.name ?? slot.deviceName}${state.firmwareVersion ? ` · ${state.firmwareVersion}` : ""}`} last>
-          <button type="button" onClick={() => { const n = prompt("Name this rig", state.name ?? ""); if (n) run("Rename", () => device.setDeviceName(n)); }} className="glass pressable h-9 px-4 rounded-full text-[14px] font-bold">Rename</button>
+          <button type="button" onClick={() => { const n = prompt("Name this rig", state.name ?? ""); if (n) run("Rename", () => device.setDeviceName(n)); }} className="glass pressable h-9 px-4 text-[14px] font-medium">Rename</button>
         </Row>
       </Glass>
-      {slot.error && <p className="mt-4 text-[13px] font-semibold text-red-400">{slot.error}</p>}
+      {slot.error && <p className="mt-4 text-[13px] font-medium text-red-400">{slot.error}</p>}
     </Screen>
   );
 }

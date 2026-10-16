@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useRoute } from "./router";
-import { store } from "./store";
-import { TabBar, Wallpaper } from "./ui";
+import { store, useRig } from "./store";
+import { TabBar } from "./ui";
 import { AppearanceScreen } from "./screens/AppearanceScreen";
 import { ConnectScreen } from "./screens/ConnectScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
@@ -12,6 +12,7 @@ import { SessionScreen } from "./screens/SessionScreen";
 
 export function App() {
   const route = useRoute();
+  const snap = useRig();
 
   useEffect(() => {
     void store.reconnectRemembered();
@@ -30,9 +31,8 @@ export function App() {
 
   return (
     <>
-      <Wallpaper />
       {screen}
-      <TabBar />
+      {snap.rig && <TabBar />}
     </>
   );
 }
