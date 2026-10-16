@@ -17,6 +17,11 @@ public enum Switch2 {
         public static let fallbackWrite = UUID(uuidString: "2C759C29-A73C-45AB-A799-31D6A032F6AF")!
         public static let fallbackNotify = UUID(uuidString: "744C98FF-83C6-45D5-BD0C-52A50589215B")!
 
+        /// The set the official app uses for the Switch Go; same packets.
+        public static let goService = UUID(uuidString: "55535343-FE7D-4AE5-8FA9-9FAFD205E455")!
+        public static let goWrite = UUID(uuidString: "49535343-8841-43F4-A8D4-ECBE34729BB3")!
+        public static let goNotify = UUID(uuidString: "49535343-1E4D-4BD9-BA61-23C647249616")!
+
         public static let otaService = UUID(uuidString: "E5C7A653-7E52-4B06-AF32-960455084AE3")!
 
         public static let deviceInformation = UUID(uuidString: "0000180A-0000-1000-8000-00805F9B34FB")!
@@ -29,7 +34,7 @@ public enum Switch2 {
         public static let batteryLevel = UUID(uuidString: "00002A19-0000-1000-8000-00805F9B34FB")!
 
         /// Services to discover on connect. The OTA service is deliberately absent.
-        public static let optionalServices = [deviceInformation, batteryService, controlService, fallbackService]
+        public static let optionalServices = [deviceInformation, batteryService, controlService, fallbackService, goService]
     }
 
     /// The write/notify pair in use. `control` is the normal one.
@@ -38,6 +43,9 @@ public enum Switch2 {
         public let notify: UUID
         public static let control = Characteristics(write: UUIDs.controlWrite, notify: UUIDs.controlNotify)
         public static let fallback = Characteristics(write: UUIDs.fallbackWrite, notify: UUIDs.fallbackNotify)
+        public static let go = Characteristics(write: UUIDs.goWrite, notify: UUIDs.goNotify)
+        /// Every write/notify pair the official app knows, in the order it prefers them.
+        public static let all: [Characteristics] = [control, fallback, go]
     }
 
     // MARK: Enumerations

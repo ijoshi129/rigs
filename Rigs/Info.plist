@@ -17,13 +17,22 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Rigs connects to your Switch 2 and Peak Pro over Bluetooth to run sessions and show live temperature.</string>
+	<string>Rigs connects to your Switch 2 over Bluetooth to run sessions and show live temperature.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Geist-UltraLight.ttf</string>
+		<string>Geist-Light.ttf</string>
+		<string>Geist-Regular.ttf</string>
+		<string>Geist-Medium.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

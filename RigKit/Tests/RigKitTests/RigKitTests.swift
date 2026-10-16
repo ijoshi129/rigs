@@ -59,6 +59,15 @@ import Testing
     }
 }
 
+@Suite struct Switch2UUIDTests {
+    @Test func everyCharacteristicSetIsDiscoverable() {
+        #expect(Switch2.Characteristics.all == [.control, .fallback, .go])
+        #expect(Set(Switch2.Characteristics.all.map(\.write)).count == 3)
+        #expect(Switch2.UUIDs.optionalServices.contains(Switch2.UUIDs.goService))
+        #expect(!Switch2.UUIDs.optionalServices.contains(Switch2.UUIDs.otaService))
+    }
+}
+
 @Suite struct Switch2MessageTests {
     @Test func statusParses() throws {
         let raw: [UInt8] = [169, 20, 0, 3, 0, 0, 12, 170, 15, 14, 1, 244, 15, 27, 170, 1, 87, 0, 60, 169]
@@ -101,57 +110,6 @@ import Testing
     }
 }
 
-// MARK: - Lorax
-
-@Suite struct LoraxTests {
-    @Test func framing() throws {
-        let cmd = Lorax.packCommand(seq: 0x0102, opcode: .readShort, payload: Data([9]))
-        #expect(cmd.byteArray == [0x02, 0x01, 16, 9])
-        let r = try Lorax.unpackReply(Data([0x02, 0x01, 0, 0xAA, 0xBB]))
-        #expect(r.seq == 0x0102 && r.ok && r.payload.byteArray == [0xAA, 0xBB])
-        #expect(throws: RigKitError.self) { try Lorax.unpackReply(Data([1, 2])) }
-    }
-
-    @Test func shortPayloads() {
-        #expect(Lorax.readShortPayload(path: "/p/bat/soc", maxLength: 240).byteArray == [0, 0, 240, 0] + Array("/p/bat/soc".utf8))
-        #expect(Lorax.writeShortPayload(path: "/p/app/mc", value: Data([7])).byteArray == [0, 0, 0] + Array("/p/app/mc".utf8) + [0, 7])
-    }
-
-    @Test func authTokenVectors() throws {
-        #expect(try Lorax.authToken(seed: Data(repeating: 0, count: 16)).hex == "b38af858578966e2c28e5afbdca34add")
-        #expect(try Lorax.authToken(seed: Data(0..<16)).hex == "cc4af4246a24eb8bb512bc7dc5157b9c")
-        #expect(throws: RigKitError.self) { try Lorax.authToken(seed: Data([1, 2, 3])) }
-    }
-
-    @Test func codecs() {
-        #expect(Lorax.Codec.fahrenheit(.le(Float(260))) == 500)
-        #expect(Lorax.Codec.fahrenheit(.le(Int32(2600))) == 500)          // Proxy tenths
-        #expect(Lorax.Codec.fahrenheit(Data([1, 2])) == nil)
-        #expect(Lorax.Codec.battery(Data([64])) == 64)
-        #expect(Lorax.Codec.battery(.le(UInt32(64))) == 64)
-        #expect(Lorax.Codec.battery(.le(Float(64))) == 64)
-        #expect(Lorax.Codec.count(.le(UInt32(1342))) == 1342)
-        #expect(Lorax.Codec.count(.le(Float(1342))) == 1342)
-        #expect(Lorax.Codec.seconds(.le(UInt32(45))) == 45)
-        #expect(Lorax.Codec.seconds(.le(Float(45))) == 45)
-        #expect(Lorax.Codec.seconds(.le(UInt32(45_000)), millisecondsAbove: 300) == 45)
-    }
-
-    @Test func firmwareLetters() {
-        #expect(Lorax.Codec.firmwareLetters(1) == "A")
-        #expect(Lorax.Codec.firmwareLetters(21) == "Z")
-        #expect(Lorax.Codec.firmwareLetters(22) == "AA")
-        #expect(Lorax.Codec.firmwareLetters(28) == "AG")
-        #expect(Lorax.Codec.firmwareLetters(0) == "X*")
-    }
-
-    @Test func colorRoundTrip() {
-        let c = Lorax.Color(red: 10, green: 20, blue: 30, mode: .breathing)
-        #expect(c.encoded.byteArray == [10, 20, 30, 0, 5, 0, 0, 0])
-        #expect(Lorax.Color.decode(c.encoded) == c)
-    }
-}
-
 // MARK: - Device actors against simulators
 
 @Suite struct Switch2DeviceTests {
@@ -191,68 +149,5 @@ import Testing
     @Test func settingsNeedAStatusFirst() async throws {
         let dev = Switch2Device(transport: MockTransport())
         await #expect(throws: RigKitError.self) { try await dev.startSession() }
-    }
-}
-
-@Suite struct PeakProDeviceTests {
-    @Test func handshakeThenSession() async throws {
-        let sim = PeakProSimulator()
-        sim.speed = 50
-        let dev = PeakProDevice(transport: sim.transport)
-        try await dev.connect()
-        var s = await dev.state
-        #expect(s.authenticated)
-        #expect(s.name == "Peak Pro" && s.model == "Peak Pro" && s.firmware == "AG")
-        #expect(s.profiles[1].name == "Medium")
-        #expect(abs((s.profiles[1].fahrenheit ?? 0) - 500) < 0.01)
-        #expect(s.profiles[1].seconds == 60)
-        #expect(s.activeProfile == 1 && s.batteryPercent == 64 && s.chamberType == .xl)
-        #expect(s.totalDabs == 1342)
-
-        try await dev.startSession()
-        s = await dev.state
-        #expect(s.isHeating)
-        for _ in 0..<200 {
-            try await dev.refreshFast()
-            s = await dev.state
-            if s.operatingState == .active { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(s.operatingState == .active)
-        #expect((s.temperatureFahrenheit ?? 0) > 490)
-        #expect(s.totalSeconds == 60)
-
-        try await dev.stopSession()
-        s = await dev.state
-        #expect(s.operatingState == .fade || s.operatingState == .idle)
-        #expect(!s.isHeating || s.operatingState == .fade)
-
-        try await dev.setProfileTemperature(slot: 0, fahrenheit: 460)
-        #expect(sim.value(at: Lorax.Path.profileTemperature(0))?.leFloat32.map { abs($0 - 237.78) < 0.01 } == true)
-        try await dev.setLantern(on: true, color: Lorax.Color(red: 255, green: 0, blue: 0))
-        #expect(sim.value(at: Lorax.Path.lanternCommand)?.byteArray == [1])
-        #expect(sim.value(at: Lorax.Path.lanternTime)?.leFloat32 == 7200)
-        await dev.disconnect()
-    }
-
-    @Test func wrongKeyIsRefused() async throws {
-        // Reads before unlock come back with a non-zero status, so a device
-        // whose handshake fails must not report itself authenticated.
-        let sim = PeakProSimulator()
-        let transport = MockTransport()
-        let inner = sim.transport
-        transport.onRead = { try await inner.read(from: $0) }
-        transport.onWrite = { c, d in
-            var bytes = d.byteArray
-            if bytes.count > 3, bytes[2] == Lorax.Opcode.unlockAccess.rawValue { bytes[3] ^= 0xFF }
-            try await inner.write(Data(bytes), to: c, withResponse: false)
-        }
-        // Forward simulator replies through our transport.
-        let replies = try await inner.subscribe(to: Lorax.UUIDs.reply)
-        let forward = Task { for await d in replies { transport.emit(d, on: Lorax.UUIDs.reply) } }
-        defer { forward.cancel() }
-
-        let dev = PeakProDevice(transport: transport)
-        await #expect(throws: RigKitError.authenticationFailed(status: 1)) { try await dev.connect() }
     }
 }

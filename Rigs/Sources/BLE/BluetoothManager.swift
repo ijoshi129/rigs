@@ -3,198 +3,185 @@ import Foundation
 import Observation
 import RigKit
 
-enum RigKind: String, Codable, Sendable {
-    case switch2, peakPro
-
-    var displayName: String {
-        switch self {
-        case .switch2: "Switch 2"
-        case .peakPro: "Peak Pro"
-        }
-    }
-
-    /// Services the device advertises; used as the scan filter.
-    var advertisedServices: [UUID] {
-        switch self {
-        case .switch2: [Switch2.UUIDs.controlService]
-        case .peakPro: [Lorax.UUIDs.legacyService, Lorax.UUIDs.service]
-        }
-    }
-
-    var servicesToDiscover: [UUID] {
-        switch self {
-        case .switch2: Switch2.UUIDs.optionalServices
-        case .peakPro: Lorax.UUIDs.optionalServices
-        }
-    }
-}
-
-struct DiscoveredRig: Identifiable, Equatable, Sendable {
+struct DiscoveredPeripheral: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
-    let kind: RigKind
     var rssi: Int
+    let looksLikeSwitch2: Bool
 }
 
-/// Scans, connects, and hands each connected peripheral to the right
-/// controller. Everything here runs on the main actor; CoreBluetooth
-/// callbacks are delivered on the main queue and hop in explicitly.
+/// Finds, connects, and keeps hold of the Switch 2.
+///
+/// Connect scans and takes the first rig it hears. After that the rig is
+/// remembered, and a pending `connect` is always outstanding while it is out
+/// of range or off, so it reattaches on its own with no timeout. CoreBluetooth
+/// callbacks arrive on the main queue and hop onto the main actor.
 @MainActor @Observable
 final class BluetoothManager: NSObject {
     private(set) var bluetoothState: CBManagerState = .unknown
-    private(set) var discovered: [DiscoveredRig] = []
-    private(set) var isScanning = false
-    private(set) var connecting: UUID?
+    /// Every nearby peripheral, for the "show every nearby device" list.
+    private(set) var nearby: [DiscoveredPeripheral] = []
+    private(set) var isSearching = false
+    private(set) var isReconnecting = false
     var lastError: String?
 
-    private(set) var switch2: Switch2Controller?
-    private(set) var peakPro: PeakProController?
+    private(set) var controller: Switch2Controller?
 
+    private let log: SessionLog
     private var central: CBCentralManager!
-    private var transports: [UUID: PeripheralTransport] = [:]
-    private var kinds: [UUID: RigKind] = [:]
-    private var connectWaiters: [UUID: CheckedContinuation<Void, any Error>] = [:]
+    private var transport: PeripheralTransport?
+    private var peripheral: CBPeripheral?
+    private var connectWaiter: CheckedContinuation<Void, any Error>?
+    private var searchTimeout: Task<Void, Never>?
+    private var listAll = false
+    private var forgotten = false
 
-    private let rememberedKey = "rememberedRigs"
+    private let rememberedKey = "rigs.remembered"
 
-    override init() {
+    init(log: SessionLog) {
+        self.log = log
         super.init()
         central = CBCentralManager(delegate: self, queue: .main, options: [CBCentralManagerOptionShowPowerAlertKey: true])
     }
 
     var isReady: Bool { bluetoothState == .poweredOn }
+    var hasRemembered: Bool { rememberedID != nil }
 
-    // MARK: Scanning
-
-    func startScan() {
-        guard isReady, !isScanning else { return }
-        discovered.removeAll()
-        isScanning = true
-        let services = (RigKind.switch2.advertisedServices + RigKind.peakPro.advertisedServices).map { CBUUID(nsuuid: $0) }
-        central.scanForPeripherals(withServices: services, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+    private var rememberedID: UUID? {
+        get { UserDefaults.standard.string(forKey: rememberedKey).flatMap(UUID.init(uuidString:)) }
+        set { UserDefaults.standard.set(newValue?.uuidString, forKey: rememberedKey) }
     }
 
-    func stopScan() {
-        central.stopScan()
-        isScanning = false
-    }
+    // MARK: Finding the rig
 
-    // MARK: Connecting
-
-    func connect(_ rig: DiscoveredRig) async {
-        guard connecting == nil else { return }
-        stopScan()
-        connecting = rig.id
+    /// Scans and connects to the first Switch 2 it hears. With `everything`,
+    /// lists every nearby peripheral instead so the user can pick.
+    func search(everything: Bool = false) {
+        guard isReady else {
+            lastError = bluetoothState == .unauthorized
+                ? "Rigs isn't allowed to use Bluetooth. Turn it on in Settings › Rigs."
+                : "Bluetooth is off. Turn it on in Control Center."
+            return
+        }
+        stopSearch()
+        nearby.removeAll()
+        listAll = everything
+        isSearching = true
         lastError = nil
-        defer { connecting = nil }
+        forgotten = false
+        // No service filter: the rig doesn't always put its service in the advertisement.
+        central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        if !everything {
+            searchTimeout = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled, let self, isSearching else { return }
+                stopSearch()
+                lastError = "No Switch 2 found. Is it on, with pairing turned on?"
+            }
+        }
+    }
+
+    func stopSearch() {
+        searchTimeout?.cancel()
+        if isSearching { central.stopScan() }
+        isSearching = false
+    }
+
+    /// Connects to a peripheral picked from the `nearby` list.
+    func connect(to id: UUID) {
+        stopSearch()
+        guard let p = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
+        Task { await connectAndSetUp(p, userInitiated: true) }
+    }
+
+    // MARK: Reconnecting
+
+    /// Called when Bluetooth powers on, and after every unexpected drop.
+    private func reconnectRemembered() {
+        guard isReady, !forgotten, let id = rememberedID, transport == nil,
+              let p = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
+        isReconnecting = true
+        Task { await connectAndSetUp(p, userInitiated: false) }
+    }
+
+    /// Forgets the rig: disconnects and stops reconnecting.
+    func forget() async {
+        forgotten = true
+        rememberedID = nil
+        stopSearch()
+        isReconnecting = false
+        if let p = peripheral { central.cancelPeripheralConnection(p) }
+        await controller?.device?.disconnect()
+        controller = nil
+        transport = nil
+        peripheral = nil
+    }
+
+    // MARK: Connection
+
+    private func connectAndSetUp(_ p: CBPeripheral, userInitiated: Bool) async {
+        peripheral = p
+        let t = PeripheralTransport(peripheral: p, central: central)
+        transport = t
         do {
-            try await connectPeripheral(id: rig.id, kind: rig.kind)
-            remember(rig.id, kind: rig.kind)
+            // A user-initiated connect gives up after 20 s; a reconnect waits for as long as it takes.
+            let timeout = userInitiated ? Task { [weak self] in
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled else { return }
+                self?.abandonConnect()
+            } : nil
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
+                connectWaiter = c
+                central.connect(p, options: nil)
+            }
+            timeout?.cancel()
+
+            try await t.discover(services: Switch2.UUIDs.optionalServices)
+            guard let chars = Switch2.Characteristics.all.first(where: { t.hasCharacteristic($0.notify) && t.hasCharacteristic($0.write) }) else {
+                throw RigKitError.unsupported("This doesn't look like a Switch 2: none of its Bluetooth services match.")
+            }
+            let device = Switch2Device(transport: t, characteristics: chars)
+            let ctl = controller ?? Switch2Controller(name: p.name ?? "Switch 2", log: log)
+            ctl.attach(device)
+            controller = ctl
+            try await device.connect()
+            rememberedID = p.identifier
+            isReconnecting = false
+            lastError = nil
         } catch {
-            lastError = "\(rig.kind.displayName): \(describe(error))"
-            if let t = transports.removeValue(forKey: rig.id) { await t.disconnect() }
+            transport = nil
+            if userInitiated {
+                central.cancelPeripheralConnection(p)
+                lastError = describe(error)
+            } else {
+                // Keep trying in the background.
+                try? await Task.sleep(for: .seconds(3))
+                reconnectRemembered()
+            }
         }
     }
 
-    /// Tries the rigs connected last time, without scanning.
-    func reconnectRemembered() async {
-        guard isReady else { return }
-        for (id, kind) in remembered() where transports[id] == nil {
-            guard central.retrievePeripherals(withIdentifiers: [id]).first != nil else { continue }
-            connecting = id
-            do { try await connectPeripheral(id: id, kind: kind) } catch { /* not in range; fine */ }
-            connecting = nil
-        }
-    }
-
-    private func connectPeripheral(id: UUID, kind: RigKind) async throws {
-        guard let peripheral = central.retrievePeripherals(withIdentifiers: [id]).first else {
-            throw RigKitError.unsupported("peripheral not found")
-        }
-        let transport = PeripheralTransport(peripheral: peripheral, central: central)
-        transports[id] = transport
-        kinds[id] = kind
-
-        let timeout = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(20))
-            guard !Task.isCancelled else { return }
-            await self?.abandonConnect(id)
-        }
-        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, any Error>) in
-            connectWaiters[id] = c
-            central.connect(peripheral, options: nil)
-        }
-        timeout.cancel()
-        try await transport.discover(services: kind.servicesToDiscover)
-
-        switch kind {
-        case .switch2:
-            let chars: Switch2.Characteristics = transport.hasCharacteristic(Switch2.UUIDs.controlNotify) ? .control : .fallback
-            let device = Switch2Device(transport: transport, characteristics: chars)
-            let controller = Switch2Controller(device: device, name: peripheral.name ?? "Switch 2")
-            controller.start()
-            try await device.connect()
-            switch2 = controller
-        case .peakPro:
-            let device = PeakProDevice(transport: transport)
-            let controller = PeakProController(device: device, name: peripheral.name ?? "Peak Pro")
-            controller.start()
-            try await device.connect()
-            await device.startPolling()
-            peakPro = controller
-        }
-    }
-
-    private func abandonConnect(_ id: UUID) {
-        guard let c = connectWaiters.removeValue(forKey: id) else { return }
-        if let p = central.retrievePeripherals(withIdentifiers: [id]).first {
-            central.cancelPeripheralConnection(p)
-        }
+    private func abandonConnect() {
+        guard let c = connectWaiter else { return }
+        connectWaiter = nil
+        if let p = peripheral { central.cancelPeripheralConnection(p) }
         c.resume(throwing: RigKitError.timeout)
-    }
-
-    func disconnect(_ kind: RigKind) async {
-        switch kind {
-        case .switch2:
-            await switch2?.device.disconnect()
-            switch2 = nil
-        case .peakPro:
-            await peakPro?.device.disconnect()
-            peakPro = nil
-        }
-        forget(kind)
-    }
-
-    // MARK: Remembered rigs
-
-    private func remembered() -> [UUID: RigKind] {
-        guard let data = UserDefaults.standard.data(forKey: rememberedKey),
-              let map = try? JSONDecoder().decode([String: RigKind].self, from: data) else { return [:] }
-        return Dictionary(uniqueKeysWithValues: map.compactMap { k, v in UUID(uuidString: k).map { ($0, v) } })
-    }
-
-    private func remember(_ id: UUID, kind: RigKind) {
-        var map = remembered().filter { $0.value != kind }
-        map[id] = kind
-        save(map)
-    }
-
-    private func forget(_ kind: RigKind) {
-        save(remembered().filter { $0.value != kind })
-    }
-
-    private func save(_ map: [UUID: RigKind]) {
-        let encodable = Dictionary(uniqueKeysWithValues: map.map { ($0.key.uuidString, $0.value) })
-        UserDefaults.standard.set(try? JSONEncoder().encode(encodable), forKey: rememberedKey)
     }
 
     private func describe(_ error: any Error) -> String {
         switch error {
-        case RigKitError.timeout: "timed out. Is it on, in range, and disconnected from the official app?"
-        case RigKitError.authenticationFailed(let s): "handshake refused (status \(s))."
-        case RigKitError.notConnected: "link dropped during setup."
-        default: error.localizedDescription
+        case RigKitError.timeout: "The Switch 2 timed out. Is it on, nearby, and closed in the Dr. Dabber app?"
+        case RigKitError.notConnected: "The Switch 2 dropped the connection during setup. Try again."
+        case RigKitError.unsupported(let why): why
+        default: "Couldn't connect: \(error.localizedDescription)"
         }
+    }
+
+    nonisolated fileprivate static func looksLikeSwitch2(name: String?, services: [CBUUID]) -> Bool {
+        let known = [Switch2.UUIDs.controlService, Switch2.UUIDs.fallbackService, Switch2.UUIDs.goService].map { CBUUID(nsuuid: $0) }
+        if services.contains(where: known.contains) { return true }
+        guard let name else { return false }
+        return ["Switch", "SW2", "Dr", "DD"].contains { name.hasPrefix($0) }
     }
 }
 
@@ -205,53 +192,60 @@ extension BluetoothManager: CBCentralManagerDelegate {
         let state = central.state
         MainActor.assumeIsolated {
             bluetoothState = state
-            if state != .poweredOn { isScanning = false }
+            if state == .poweredOn {
+                reconnectRemembered()
+            } else {
+                isSearching = false
+            }
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                                     advertisementData: [String: Any], rssi RSSI: NSNumber) {
         let services = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? []
-        let kind: RigKind? = services.contains(CBUUID(nsuuid: Switch2.UUIDs.controlService)) ? .switch2
-            : services.contains(where: { $0 == CBUUID(nsuuid: Lorax.UUIDs.legacyService) || $0 == CBUUID(nsuuid: Lorax.UUIDs.service) }) ? .peakPro
-            : nil
-        guard let kind else { return }
-        let name = (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? peripheral.name ?? kind.displayName
+        let name = (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? peripheral.name
         let id = peripheral.identifier
         let rssi = RSSI.intValue
+        let match = Self.looksLikeSwitch2(name: name, services: services)
         MainActor.assumeIsolated {
-            if let i = discovered.firstIndex(where: { $0.id == id }) {
-                discovered[i].rssi = rssi
-            } else {
-                discovered.append(DiscoveredRig(id: id, name: name, kind: kind, rssi: rssi))
+            guard isSearching else { return }
+            if listAll {
+                guard name != nil || match else { return }
+                if let i = nearby.firstIndex(where: { $0.id == id }) {
+                    nearby[i].rssi = rssi
+                } else {
+                    nearby.append(DiscoveredPeripheral(id: id, name: name ?? "Unnamed", rssi: rssi, looksLikeSwitch2: match))
+                    nearby.sort { ($0.looksLikeSwitch2 ? 1 : 0, $0.rssi) > ($1.looksLikeSwitch2 ? 1 : 0, $1.rssi) }
+                }
+            } else if match, let p = self.central.retrievePeripherals(withIdentifiers: [id]).first {
+                stopSearch()
+                Task { await connectAndSetUp(p, userInitiated: true) }
             }
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        let id = peripheral.identifier
-        MainActor.assumeIsolated { connectWaiters.removeValue(forKey: id)?.resume() }
+        MainActor.assumeIsolated {
+            connectWaiter?.resume()
+            connectWaiter = nil
+        }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: (any Error)?) {
-        let id = peripheral.identifier
         MainActor.assumeIsolated {
-            connectWaiters.removeValue(forKey: id)?.resume(throwing: error ?? RigKitError.notConnected)
-            transports.removeValue(forKey: id)
+            connectWaiter?.resume(throwing: error ?? RigKitError.notConnected)
+            connectWaiter = nil
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: (any Error)?) {
-        let id = peripheral.identifier
         MainActor.assumeIsolated {
-            transports.removeValue(forKey: id)?.linkDropped()
-            connectWaiters.removeValue(forKey: id)?.resume(throwing: RigKitError.notConnected)
-            if let kind = kinds.removeValue(forKey: id) {
-                switch kind {
-                case .switch2: switch2?.markDisconnected()
-                case .peakPro: peakPro?.markDisconnected()
-                }
-            }
+            transport?.linkDropped()
+            transport = nil
+            connectWaiter?.resume(throwing: RigKitError.notConnected)
+            connectWaiter = nil
+            controller?.markDisconnected()
+            if !forgotten { reconnectRemembered() }
         }
     }
 }
