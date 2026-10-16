@@ -2,7 +2,23 @@ import SwiftUI
 
 @main
 struct RigsApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
+
+    init() {
+        let model = AppModel()
+        _model = State(initialValue: model)
+        // Siri, Shortcuts and controls may launch the app in the background; this is all they need.
+        RigIntentBridge.handler = { [weak model] command in
+            guard let model else { throw RigIntentError("Rigs isn't ready. Try again.") }
+            return try await model.perform(command)
+        }
+        if let command = DebugLaunch.intent {
+            Task {
+                do { Diagnostics.shared.record(.app, "intent reply: \(try await RigIntentBridge.run(command))") }
+                catch { Diagnostics.shared.record(.error, "intent failed: \(error)") }
+            }
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

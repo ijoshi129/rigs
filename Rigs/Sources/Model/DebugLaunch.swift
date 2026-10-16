@@ -10,6 +10,18 @@ enum DebugLaunch {
         return Int(o.dropFirst(7))
     }
 
+    /// `-intent start|stop|status|preset:N` runs that App Intent command after launch.
+    static var intent: RigCommand? {
+        switch value(after: "-intent") {
+        case "start": .start(preset: nil)
+        case "stop": .stop
+        case "status": .status
+        case let v? where v.hasPrefix("preset:"): Int(v.dropFirst(7)).map { .preset($0) }
+        case let v? where v.hasPrefix("start:"): .start(preset: Int(v.dropFirst(6)))
+        default: nil
+        }
+    }
+
     private static func value(after flag: String) -> String? {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments

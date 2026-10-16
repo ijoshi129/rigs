@@ -6,6 +6,8 @@ import WidgetKit
 struct RigsWidgets: WidgetBundle {
     var body: some Widget {
         RigLiveActivity()
+        StartHeatingControl()
+        StopHeatingControl()
     }
 }
 
@@ -29,7 +31,11 @@ struct RigLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 8) {
-                        StatusLine(state: s, attributes: context.attributes)
+                        HStack {
+                            StatusLine(state: s, attributes: context.attributes)
+                            Spacer(minLength: 4)
+                            if s.phase != .done { StopButton() }
+                        }
                         HoldBar(state: s)
                     }
                     .padding(.horizontal, 6)
@@ -68,8 +74,12 @@ private struct LockScreenView: View {
                     Countdown(state: s, size: 17)
                 }
                 HoldBar(state: s)
-                Text("\(context.attributes.rigName) · \(context.attributes.profile)")
-                    .font(.geist(12)).foregroundStyle(Theme.ink2)
+                HStack {
+                    Text("\(context.attributes.rigName) · \(context.attributes.profile)")
+                        .font(.geist(12)).foregroundStyle(Theme.ink2)
+                    Spacer(minLength: 4)
+                    if s.phase != .done { StopButton() }
+                }
             }
         }
         .padding(18)
@@ -104,6 +114,24 @@ private struct StatusLine: View {
         case .done: "Done"
         }
         Text(text).font(.geist(15))
+    }
+}
+
+/// Stops the session from the Lock Screen or Dynamic Island.
+private struct StopButton: View {
+    var body: some View {
+        Button(intent: StopSessionIntent()) {
+            HStack(spacing: 6) {
+                Rectangle().frame(width: 8, height: 8)
+                Text("Stop").font(.geist(13, .medium))
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .overlay(Rectangle().strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop heating")
     }
 }
 

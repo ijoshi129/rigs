@@ -98,6 +98,17 @@ final class Switch2Controller {
     func cleaningAssist(_ on: Bool) { run("Cleaning") { try await $0.setCleaningAssist(on) } }
     func rename(_ n: String) { run("Rename") { try await $0.setDeviceName(n) } }
 
+    /// Runs a command and waits for the write, for Siri and Shortcuts.
+    func perform(_ label: String, _ op: @Sendable (Switch2Device) async throws -> Void) async throws {
+        guard let device, connected else { throw RigKitError.notConnected }
+        do {
+            try await op(device)
+        } catch {
+            Diagnostics.shared.record(.error, "\(label) failed: \(error)")
+            throw error
+        }
+    }
+
     /// Writes a preset and waits for it, so the editor can show "Saving…".
     func savePreset(_ p: Switch2.Preset) async {
         guard let device else { return }
