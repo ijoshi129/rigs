@@ -54,24 +54,32 @@ struct RootView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            if let rig = model.rig {
-                ZStack(alignment: .bottom) {
-                    // Each tab keeps its own navigation stack alive.
-                    ForEach(Tab.allCases, id: \.self) { t in
-                        NavigationStack { screen(t, rig) }
-                            .opacity(tab == t ? 1 : 0)
-                            .allowsHitTesting(tab == t)
-                    }
-                    TabBar(selection: $tab)
-                }
-                .environment(rig)
-            } else {
-                ConnectView()
-            }
+            #if DEBUG
+            if DebugLaunch.open?.hasPrefix("activity") == true { ActivityGallery() } else { content }
+            #else
+            content
+            #endif
         }
         .sheet(isPresented: $showDiagnostics) { DiagnosticsSheet() }
         .onChange(of: scenePhase) { _, phase in
             Diagnostics.shared.record(.app, "app \(phase == .active ? "active" : phase == .background ? "in background" : "inactive")")
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let rig = model.rig {
+            ZStack(alignment: .bottom) {
+                // Each tab keeps its own navigation stack alive.
+                ForEach(Tab.allCases, id: \.self) { t in
+                    NavigationStack { screen(t, rig) }
+                        .opacity(tab == t ? 1 : 0)
+                        .allowsHitTesting(tab == t)
+                }
+                TabBar(selection: $tab)
+            }
+            .environment(rig)
+        } else {
+            ConnectView()
         }
     }
 

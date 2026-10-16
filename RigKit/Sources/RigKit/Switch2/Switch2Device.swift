@@ -4,6 +4,8 @@ import Foundation
 /// paces writes the way the official app does.
 ///
 /// `updates` is a single-consumer stream: read it from one place (the view model).
+/// It yields the last known state once more when the link drops, then ends.
+/// A device is good for one link; make a new one to reconnect.
 public actor Switch2Device {
     public let characteristics: Switch2.Characteristics
     private let transport: any BLETransport
@@ -50,8 +52,10 @@ public actor Switch2Device {
     }
 
     private func linkDropped() {
+        guard connected else { return }
         connected = false
         continuation.yield(state)
+        continuation.finish()
     }
 
     private func handle(_ packet: Data) {

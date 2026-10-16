@@ -44,6 +44,23 @@ public final class MockTransport: BLETransport, @unchecked Sendable {
         await onDisconnect?()
     }
 
+    /// Drops the link as if the rig went out of range: streams end and
+    /// writes fail, without the `onDisconnect` hook a requested disconnect runs.
+    public func dropLink() {
+        let conts = lock.withLock {
+            open = false
+            let c = Array(streams.values)
+            streams.removeAll()
+            return c
+        }
+        conts.forEach { $0.finish() }
+    }
+
+    /// Brings a dropped link back, for reconnect tests.
+    public func reopen() {
+        lock.withLock { open = true }
+    }
+
     /// Pushes a notification to whoever subscribed to `characteristic`.
     public func emit(_ data: Data, on characteristic: UUID) {
         lock.withLock { streams[characteristic] }?.yield(data)

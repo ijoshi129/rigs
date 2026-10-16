@@ -89,6 +89,7 @@ final class Switch2Controller {
 
     func markDisconnected() {
         connected = false
+        liveActivity.linkLost()
     }
 
     private func apply(_ s: Switch2.State, from source: Switch2Device) {
@@ -99,7 +100,9 @@ final class Switch2Controller {
         } else {
             state = snapshot?.underlay(s) ?? s
         }
-        guard let status = s.status else { return }
+        // After a drop the device reports its last state once more; that's
+        // stale, so keep the Live Activity on "Reconnecting…".
+        guard let status = s.status, connected else { return }
         liveActivity.update(s, rigName: name)
         log.track(heating: status.sessionActive, fahrenheit: status.temperatureFahrenheit) {
             let p = s.activePresetSettings

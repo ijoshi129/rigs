@@ -90,7 +90,7 @@ import Testing
     }
 
     @Test func analyticsLength20() {
-        let raw: [UInt8] = [162, 20, 1, 244, 1, 4, 1, 44, 0, 9, 0, 48, 193, 10, 16, 0, 0, 2, 162]
+        let raw: [UInt8] = [162, 20, 1, 244, 1, 4, 1, 44, 0, 9, 0, 48, 193, 10, 16, 0, 0, 2, 0, 162]
         guard case let .analytics(a)? = Switch2.Message.parse(Data(raw)) else { Issue.record("no analytics"); return }
         #expect(a.favoriteTempF == 500 && a.favoriteTempC == 260)
         #expect(a.totalHeatingCycles == 300 && a.mostCyclesInADay == 9 && a.totalChargeCycles == 48)

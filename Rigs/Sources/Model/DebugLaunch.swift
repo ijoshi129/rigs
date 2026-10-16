@@ -1,7 +1,7 @@
 import Foundation
 
 /// Launch arguments for screenshots in Debug builds: `-tab presets`,
-/// `-open settings`, `-open help`, `-open diagnostics`, `-open preset:2`. Release builds ignore them.
+/// `-open settings`, `-open help`, `-open diagnostics`, `-open activity`, `-open preset:2`. Release builds ignore them.
 enum DebugLaunch {
     static var open: String? { value(after: "-open") }
     static var tab: Tab? { value(after: "-tab").flatMap { Tab(rawValue: $0.capitalized) } }

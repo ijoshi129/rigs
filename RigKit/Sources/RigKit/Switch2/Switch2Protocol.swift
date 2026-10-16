@@ -350,8 +350,12 @@ public enum Switch2 {
         case maintenance(cleaningActive: Bool, factoryResetStatus: UInt8)
         case unknown(opcode: UInt8, Data)
 
+        /// Every packet is framed as `[op, length, …, op]`, with `length` the
+        /// whole packet's size (true of every packet seen from a real rig).
+        /// Anything else is a truncated or corrupt notification and is dropped,
+        /// so it can't overwrite good state with zeros.
         public static func parse(_ d: Data) -> Message? {
-            guard d.count >= 2 else { return nil }
+            guard d.count >= 3, Int(d.byte(1)) == d.count, d.byte(0) == d.byte(d.count - 1) else { return nil }
             let op = d.byte(0)
             switch op {
             case 161:

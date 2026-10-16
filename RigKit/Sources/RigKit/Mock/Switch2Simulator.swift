@@ -204,7 +204,7 @@ public final class Switch2Simulator: @unchecked Sendable {
             emit([167, 6, UInt8(p.index), UInt8(h >> 8), UInt8(h & 0xFF), 167])
         }
         emit([168, 4, UInt8(lock.withLock { settings.activePreset }), 168])
-        emit([195, 11] + Array("G1.4.2   ".utf8) + [195])
+        emit([195, 12] + Array("G1.4.2   ".utf8) + [195])
         emit([196, 11] + Array("B2.0.1  ".utf8) + [196])
         emit([225, 7, 1, 0, 0, 0, 225])
         emit([241, 5, 0, 0, 241])
