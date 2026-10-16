@@ -42,6 +42,28 @@ final class PeripheralTransport: NSObject, BLETransport, CBPeripheralDelegate, @
         lock.withLock { characteristics[uuid] != nil }
     }
 
+    /// Services and characteristics found, with their properties, for the diagnostics log.
+    func discoveredSummary() -> String {
+        let services = peripheral.services ?? []
+        guard !services.isEmpty else { return "discovered no services" }
+        return "discovered " + services.map { s in
+            let chars = (s.characteristics ?? []).map { c in
+                "\(Diagnostics.shortUUID(expand(c.uuid)))(\(Self.props(c.properties)))"
+            }
+            return "\(Diagnostics.shortUUID(expand(s.uuid))) {\(chars.joined(separator: " "))}"
+        }.joined(separator: " ")
+    }
+
+    private static func props(_ p: CBCharacteristicProperties) -> String {
+        var out = ""
+        if p.contains(.read) { out += "r" }
+        if p.contains(.write) { out += "w" }
+        if p.contains(.writeWithoutResponse) { out += "W" }
+        if p.contains(.notify) { out += "n" }
+        if p.contains(.indicate) { out += "i" }
+        return out
+    }
+
     func hasService(_ uuid: UUID) -> Bool {
         peripheral.services?.contains { expand($0.uuid) == uuid } ?? false
     }
@@ -151,6 +173,7 @@ final class PeripheralTransport: NSObject, BLETransport, CBPeripheralDelegate, @
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: (any Error)?) {
         if let error {
+            Diagnostics.shared.record(.error, "service discovery failed: \(error.localizedDescription)")
             lock.withLock { discoveryWaiter }?.resume(throwing: error)
             lock.withLock { discoveryWaiter = nil }
             return
@@ -180,6 +203,8 @@ final class PeripheralTransport: NSObject, BLETransport, CBPeripheralDelegate, @
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: (any Error)?) {
         let key = expand(characteristic.uuid)
+        Diagnostics.shared.record(error == nil ? .ble : .error,
+                                  "notify \(Diagnostics.name(key)) \(error.map { "failed: \($0.localizedDescription)" } ?? (characteristic.isNotifying ? "on" : "off"))")
         let w = lock.withLock { notifyWaiters.removeValue(forKey: key) }
         if let error { w?.resume(throwing: error) } else { w?.resume() }
     }
@@ -198,11 +223,16 @@ final class PeripheralTransport: NSObject, BLETransport, CBPeripheralDelegate, @
             if let error { reader.resume(throwing: error) } else { reader.resume(returning: value) }
             return
         }
-        if error == nil { lock.withLock { notifyStreams[key] }?.yield(value) }
+        if let error {
+            Diagnostics.shared.record(.error, "value from \(Diagnostics.name(key)) failed: \(error.localizedDescription)")
+        } else {
+            lock.withLock { notifyStreams[key] }?.yield(value)
+        }
     }
 
     nonisolated func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: (any Error)?) {
         let key = expand(characteristic.uuid)
+        if let error { Diagnostics.shared.record(.error, "write ack from \(Diagnostics.name(key)) failed: \(error.localizedDescription)") }
         let w: CheckedContinuation<Void, any Error>? = lock.withLock {
             guard var ws = writeWaiters[key], !ws.isEmpty else { return nil }
             let first = ws.removeFirst()

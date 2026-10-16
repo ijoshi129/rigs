@@ -82,6 +82,7 @@ struct HelpSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var listing = false
+    @State private var showDiagnostics = false
 
     private let steps = [
         ("Turn pairing on", "Hold + and − together for 3 seconds. The rig flashes and buzzes."),
@@ -101,6 +102,7 @@ struct HelpSheet: View {
         .presentationCornerRadius(0)
         .presentationBackground(Theme.sheet)
         .onDisappear { if listing { model.bluetooth?.stopSearch() } }
+        .sheet(isPresented: $showDiagnostics) { DiagnosticsSheet() }
     }
 
     private var stepList: some View {
@@ -127,6 +129,9 @@ struct HelpSheet: View {
                 .buttonStyle(.pressable)
                 .padding(.top, 8)
             }
+            Button("Diagnostics") { showDiagnostics = true }
+                .font(.geist(16)).foregroundStyle(Theme.ink2)
+                .frame(maxWidth: .infinity)
             Button("Done") { dismiss() }
                 .font(.geist(16)).foregroundStyle(Theme.ink2)
                 .frame(maxWidth: .infinity)

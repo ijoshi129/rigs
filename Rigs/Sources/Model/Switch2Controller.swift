@@ -80,14 +80,17 @@ final class Switch2Controller {
                 lastError = nil
             } catch {
                 lastError = "\(label): \(Self.describe(error))"
+                Diagnostics.shared.record(.error, "\(label) failed: \(error)")
             }
         }
     }
 
-    func startSession() { run("Start") { try await $0.startSession() } }
-    func stopSession() { run("Stop") { try await $0.stopSession() } }
-    func extend(to steps: Int) { run("Extend") { try await $0.extendSession(steps: steps) } }
-    func selectPreset(_ i: Int) { run("Preset") { try await $0.setActivePreset(i) } }
+    private func note(_ action: String) { Diagnostics.shared.record(.app, action) }
+
+    func startSession() { note("tap: start session"); run("Start") { try await $0.startSession() } }
+    func stopSession() { note("tap: stop session"); run("Stop") { try await $0.stopSession() } }
+    func extend(to steps: Int) { note("tap: extend to \(steps)"); run("Extend") { try await $0.extendSession(steps: steps) } }
+    func selectPreset(_ i: Int) { note("tap: preset \(i)"); run("Preset") { try await $0.setActivePreset(i) } }
     func setLightMode(_ code: UInt8) { run("Light mode") { try await $0.setLightMode(code) } }
     func setBrightness(_ p: Int) { run("Brightness") { try await $0.setBrightness(p) } }
     func setAutoShutOff(_ m: Int) { run("Auto shut-off") { try await $0.setAutoShutOff(minutes: m) } }
@@ -103,6 +106,7 @@ final class Switch2Controller {
             lastError = nil
         } catch {
             lastError = "Save preset: \(Self.describe(error))"
+            Diagnostics.shared.record(.error, "Save preset \(p.index) failed: \(error)")
         }
     }
 

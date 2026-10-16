@@ -43,6 +43,17 @@ struct SettingsView: View {
                      : "Rigs remembers the rig and reconnects on its own whenever it's on and nearby.")
                     .font(.geist(12)).foregroundStyle(Theme.ink3).padding(.top, 12).padding(.horizontal, 4)
 
+                SectionLabel("Troubleshooting")
+                Surface {
+                    NavigationLink { DiagnosticsView() } label: {
+                        Row(title: "Diagnostics", detail: "Bluetooth log, to share when something breaks", last: true) {
+                            Image(systemName: "chevron.right").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink3)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 Text("Rigs \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") · Nothing leaves your phone. No account, no cloud.")
                     .font(.geist(12)).foregroundStyle(Theme.ink3).padding(.top, 24).padding(.horizontal, 4)
             }

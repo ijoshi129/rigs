@@ -23,6 +23,8 @@ final class AppModel {
         let mock = ProcessInfo.processInfo.arguments.contains("-mock")
         #endif
         isMock = mock
+        let info = Bundle.main.infoDictionary ?? [:]
+        Diagnostics.shared.record(.app, "launch: Rigs \(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?")) on \(Diagnostics.deviceModel)\(mock ? ", simulated rig" : "")")
         bluetooth = mock ? nil : BluetoothManager(log: log)
         if mock, !ProcessInfo.processInfo.arguments.contains("-fresh") {
             Task { await connectMock() }
@@ -53,7 +55,7 @@ final class AppModel {
         defer { mockConnecting = false }
         let sim = Switch2Simulator()
         simulator = sim
-        let device = Switch2Device(transport: sim.transport)
+        let device = Switch2Device(transport: LoggingTransport(sim.transport))
         let ctl = Switch2Controller(name: "Switch 2", log: log)
         ctl.attach(device)
         try? await device.connect()

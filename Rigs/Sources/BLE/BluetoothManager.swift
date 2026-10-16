@@ -37,6 +37,7 @@ final class BluetoothManager: NSObject {
     private var forgotten = false
 
     private let rememberedKey = "rigs.remembered"
+    private let diag = Diagnostics.shared
 
     init(log: SessionLog) {
         self.log = log
@@ -58,6 +59,7 @@ final class BluetoothManager: NSObject {
     /// lists every nearby peripheral instead so the user can pick.
     func search(everything: Bool = false) {
         guard isReady else {
+            diag.record(.error, "search refused: Bluetooth is \(Self.describe(bluetoothState))")
             lastError = bluetoothState == .unauthorized
                 ? "Rigs isn't allowed to use Bluetooth. Turn it on in Settings › Rigs."
                 : "Bluetooth is off. Turn it on in Control Center."
@@ -69,6 +71,7 @@ final class BluetoothManager: NSObject {
         isSearching = true
         lastError = nil
         forgotten = false
+        diag.record(.ble, everything ? "scan started (listing every device)" : "scan started")
         // No service filter: the rig doesn't always put its service in the advertisement.
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
         if !everything {
@@ -76,6 +79,7 @@ final class BluetoothManager: NSObject {
                 try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled, let self, isSearching else { return }
                 stopSearch()
+                diag.record(.error, "scan timed out after 15 s with no Switch 2")
                 lastError = "No Switch 2 found. Is it on, with pairing turned on?"
             }
         }
@@ -83,7 +87,10 @@ final class BluetoothManager: NSObject {
 
     func stopSearch() {
         searchTimeout?.cancel()
-        if isSearching { central.stopScan() }
+        if isSearching {
+            central.stopScan()
+            diag.record(.ble, "scan stopped")
+        }
         isSearching = false
     }
 
@@ -101,12 +108,14 @@ final class BluetoothManager: NSObject {
         guard isReady, !forgotten, let id = rememberedID, transport == nil,
               let p = central.retrievePeripherals(withIdentifiers: [id]).first else { return }
         isReconnecting = true
+        diag.record(.ble, "reconnecting to remembered rig \(Self.short(id))")
         Task { await connectAndSetUp(p, userInitiated: false) }
     }
 
     /// Forgets the rig: disconnects and stops reconnecting.
     func forget() async {
         forgotten = true
+        diag.record(.app, "rig forgotten")
         rememberedID = nil
         stopSearch()
         isReconnecting = false
@@ -121,6 +130,7 @@ final class BluetoothManager: NSObject {
 
     private func connectAndSetUp(_ p: CBPeripheral, userInitiated: Bool) async {
         peripheral = p
+        diag.record(.ble, "connecting to \(p.name ?? "unnamed") \(Self.short(p.identifier))\(userInitiated ? "" : " (background)")")
         let t = PeripheralTransport(peripheral: p, central: central)
         transport = t
         do {
@@ -137,10 +147,12 @@ final class BluetoothManager: NSObject {
             timeout?.cancel()
 
             try await t.discover(services: Switch2.UUIDs.optionalServices)
+            diag.record(.ble, t.discoveredSummary())
             guard let chars = Switch2.Characteristics.all.first(where: { t.hasCharacteristic($0.notify) && t.hasCharacteristic($0.write) }) else {
                 throw RigKitError.unsupported("This doesn't look like a Switch 2: none of its Bluetooth services match.")
             }
-            let device = Switch2Device(transport: t, characteristics: chars)
+            diag.record(.ble, "using \(Diagnostics.name(chars.write)) / \(Diagnostics.name(chars.notify))")
+            let device = Switch2Device(transport: LoggingTransport(t), characteristics: chars)
             let ctl = controller ?? Switch2Controller(name: p.name ?? "Switch 2", log: log)
             ctl.attach(device)
             controller = ctl
@@ -148,7 +160,9 @@ final class BluetoothManager: NSObject {
             rememberedID = p.identifier
             isReconnecting = false
             lastError = nil
+            diag.record(.ble, "set up; waiting for the rig's state dump")
         } catch {
+            diag.record(.error, "connect failed: \(error)")
             transport = nil
             if userInitiated {
                 central.cancelPeripheralConnection(p)
@@ -166,6 +180,19 @@ final class BluetoothManager: NSObject {
         connectWaiter = nil
         if let p = peripheral { central.cancelPeripheralConnection(p) }
         c.resume(throwing: RigKitError.timeout)
+    }
+
+    private static func short(_ id: UUID) -> String { String(id.uuidString.prefix(8)) }
+
+    nonisolated static func describe(_ state: CBManagerState) -> String {
+        switch state {
+        case .poweredOn: "on"
+        case .poweredOff: "off"
+        case .unauthorized: "not allowed"
+        case .unsupported: "unsupported"
+        case .resetting: "resetting"
+        default: "unknown"
+        }
     }
 
     private func describe(_ error: any Error) -> String {
@@ -192,6 +219,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
         let state = central.state
         MainActor.assumeIsolated {
             bluetoothState = state
+            diag.record(.ble, "Bluetooth is \(Self.describe(state))")
             if state == .poweredOn {
                 reconnectRemembered()
             } else {
@@ -207,8 +235,10 @@ extension BluetoothManager: CBCentralManagerDelegate {
         let id = peripheral.identifier
         let rssi = RSSI.intValue
         let match = Self.looksLikeSwitch2(name: name, services: services)
+        let serviceList = services.map(\.uuidString).joined(separator: ", ")
         MainActor.assumeIsolated {
             guard isSearching else { return }
+            diag.record(.ble, "heard \(name ?? "unnamed") \(Self.short(id)) \(rssi) dBm services [\(serviceList)]\(match ? " ← Switch 2" : "")")
             if listAll {
                 guard name != nil || match else { return }
                 if let i = nearby.firstIndex(where: { $0.id == id }) {
@@ -226,20 +256,25 @@ extension BluetoothManager: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         MainActor.assumeIsolated {
+            diag.record(.ble, "link up")
             connectWaiter?.resume()
             connectWaiter = nil
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: (any Error)?) {
+        let reason = error.map { "\($0.localizedDescription)" } ?? "no reason given"
         MainActor.assumeIsolated {
+            diag.record(.error, "failed to connect: \(reason)")
             connectWaiter?.resume(throwing: error ?? RigKitError.notConnected)
             connectWaiter = nil
         }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: (any Error)?) {
+        let reason = error.map { "\($0.localizedDescription)" } ?? "clean disconnect"
         MainActor.assumeIsolated {
+            diag.record(error == nil ? .ble : .error, "link down: \(reason)")
             transport?.linkDropped()
             transport = nil
             connectWaiter?.resume(throwing: RigKitError.notConnected)

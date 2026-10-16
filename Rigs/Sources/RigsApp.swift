@@ -32,6 +32,8 @@ enum Tab: String, CaseIterable {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @State private var tab: Tab = DebugLaunch.tab ?? .session
+    @State private var showDiagnostics = DebugLaunch.open == "diagnostics"
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -50,6 +52,10 @@ struct RootView: View {
             } else {
                 ConnectView()
             }
+        }
+        .sheet(isPresented: $showDiagnostics) { DiagnosticsSheet() }
+        .onChange(of: scenePhase) { _, phase in
+            Diagnostics.shared.record(.app, "app \(phase == .active ? "active" : phase == .background ? "in background" : "inactive")")
         }
     }
 
